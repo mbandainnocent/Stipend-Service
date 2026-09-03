@@ -1,0 +1,641 @@
+openapi: 3.0.3
+
+info:
+  title: SheCanCODE Stipend Service API
+  version: 2.0.0
+  description: |
+    API used by the finance dashboard to review automatically calculated
+    student stipends, approve calculated stipends, and record completed payments.
+
+    Students are created from Kafka `registration-events`. Attendance records
+    are created or updated from Kafka `attendance-events`. Monthly stipends are
+    calculated automatically by the Stipend Service scheduler. This API does not
+    allow clients to create students, submit attendance, trigger calculations,
+    or change calculated stipend amounts.
+  contact:
+    name: Igire Rwanda Organization
+    email: info@igirerwanda.org
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Stipends
+    description: Review automatically calculated monthly stipends.
+  - name: Finance Workflow
+    description: Approve stipends and record completed payments.
+  - name: Stipend Policies
+    description: View the policies used by the calculation engine.
+
+paths:
+  /api/v1/stipends:
+    get:
+      tags: [Stipends]
+      summary: Search monthly stipends
+      description: Returns monthly stipends for the finance dashboard.
+      operationId: listMonthlyStipends
+      parameters:
+        - $ref: '#/components/parameters/YearQueryOptional'
+        - $ref: '#/components/parameters/MonthQueryOptional'
+        - $ref: '#/components/parameters/CohortIdQuery'
+        - name: studentId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/StipendStatus'
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/SizeQuery'
+      responses:
+        '200':
+          description: Stipends returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyStipendPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/stipends/{stipendId}:
+    get:
+      tags: [Stipends]
+      summary: Get one monthly stipend
+      operationId: getMonthlyStipend
+      parameters:
+        - $ref: '#/components/parameters/StipendIdPath'
+      responses:
+        '200':
+          description: Stipend returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyStipendResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/students/{studentId}/stipends:
+    get:
+      tags: [Stipends]
+      summary: Get a student's stipend history
+      operationId: getStudentStipends
+      parameters:
+        - $ref: '#/components/parameters/StudentIdPath'
+        - $ref: '#/components/parameters/YearQueryOptional'
+      responses:
+        '200':
+          description: Student stipend history returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonthlyStipendResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/cohorts/{cohortId}/stipends:
+    get:
+      tags: [Stipends]
+      summary: Get stipends for a cohort and month
+      operationId: getCohortStipends
+      parameters:
+        - $ref: '#/components/parameters/CohortIdPath'
+        - $ref: '#/components/parameters/YearQuery'
+        - $ref: '#/components/parameters/MonthQuery'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/StipendStatus'
+      responses:
+        '200':
+          description: Cohort stipends returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonthlyStipendResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/stipends/{stipendId}/approve:
+    patch:
+      tags: [Finance Workflow]
+      summary: Approve a calculated stipend
+      description: |
+        Changes a stipend from CALCULATED to APPROVED. The authenticated
+        finance user is recorded as the approver. Calculated financial fields
+        cannot be supplied or changed by this operation.
+      operationId: approveMonthlyStipend
+      parameters:
+        - $ref: '#/components/parameters/StipendIdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveStipendRequest'
+      responses:
+        '200':
+          description: Stipend approved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyStipendResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Current stipend status cannot transition to APPROVED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/stipends/{stipendId}/mark-paid:
+    patch:
+      tags: [Finance Workflow]
+      summary: Mark an approved stipend as paid
+      description: |
+        Changes an APPROVED stipend to PAID and records the external payment
+        reference. This operation cannot change the calculated stipend amount.
+      operationId: markMonthlyStipendPaid
+      parameters:
+        - $ref: '#/components/parameters/StipendIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkPaidRequest'
+            example:
+              paymentReference: MTN-2026-08-000123
+              paidAt: '2026-09-05T14:30:00Z'
+      responses:
+        '200':
+          description: Stipend marked as paid successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyStipendResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Only an approved stipend can be marked as paid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/stipend-policies:
+    get:
+      tags: [Stipend Policies]
+      summary: List stipend policies
+      description: Returns policies used by the automatic calculation engine.
+      operationId: listStipendPolicies
+      parameters:
+        - $ref: '#/components/parameters/ProgramIdQuery'
+        - $ref: '#/components/parameters/CohortIdQuery'
+        - name: enabled
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Policies returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StipendPolicyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/stipend-policies/{policyId}:
+    get:
+      tags: [Stipend Policies]
+      summary: Get one stipend policy
+      operationId: getStipendPolicy
+      parameters:
+        - $ref: '#/components/parameters/PolicyIdPath'
+      responses:
+        '200':
+          description: Policy returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StipendPolicyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    StipendIdPath:
+      name: stipendId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StudentIdPath:
+      name: studentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CohortIdPath:
+      name: cohortId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PolicyIdPath:
+      name: policyId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProgramIdQuery:
+      name: programId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    CohortIdQuery:
+      name: cohortId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    YearQuery:
+      name: year
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 2020
+        maximum: 2100
+        example: 2026
+    YearQueryOptional:
+      name: year
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 2020
+        maximum: 2100
+    MonthQuery:
+      name: month
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 12
+        example: 8
+    MonthQueryOptional:
+      name: month
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 12
+    PageQuery:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    SizeQuery:
+      name: size
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication is required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: The authenticated user does not have finance access
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    MonthlyStipendResponse:
+      type: object
+      required:
+        - id
+        - studentId
+        - studentName
+        - cohortId
+        - policyId
+        - stipendYear
+        - stipendMonth
+        - absenceCount
+        - baseAmount
+        - paymentPercentage
+        - calculatedAmount
+        - currency
+        - status
+        - calculatedAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        studentId:
+          type: string
+          format: uuid
+        studentName:
+          type: string
+          example: Aline Uwase
+        cohortId:
+          type: string
+          format: uuid
+        policyId:
+          type: string
+          format: uuid
+        stipendYear:
+          type: integer
+          example: 2026
+        stipendMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+          example: 8
+        absenceCount:
+          type: integer
+          minimum: 0
+          example: 3
+        baseAmount:
+          type: number
+          format: decimal
+          example: 50000.00
+        paymentPercentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+          example: 75.00
+        calculatedAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          example: 37500.00
+        currency:
+          type: string
+          example: RWF
+        status:
+          $ref: '#/components/schemas/StipendStatus'
+        approvedBy:
+          type: string
+          nullable: true
+        approvalComment:
+          type: string
+          nullable: true
+        approvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        paymentReference:
+          type: string
+          nullable: true
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        calculatedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    MonthlyStipendPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/MonthlyStipendResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+
+    ApproveStipendRequest:
+      type: object
+      properties:
+        comment:
+          type: string
+          maxLength: 500
+          example: Attendance reviewed and amount confirmed.
+
+    MarkPaidRequest:
+      type: object
+      required: [paymentReference, paidAt]
+      properties:
+        paymentReference:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: MTN-2026-08-000123
+        paidAt:
+          type: string
+          format: date-time
+
+    StipendPolicyResponse:
+      type: object
+      required:
+        - id
+        - programId
+        - cohortId
+        - baseAmount
+        - currency
+        - effectiveFrom
+        - enabled
+        - tiers
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        cohortId:
+          type: string
+          format: uuid
+        baseAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          example: 50000.00
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: RWF
+        effectiveFrom:
+          type: string
+          format: date
+        effectiveTo:
+          type: string
+          format: date
+          nullable: true
+        enabled:
+          type: boolean
+        tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/StipendTierResponse'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    StipendTierResponse:
+      type: object
+      required: [id, minimumAbsences, paymentPercentage]
+      properties:
+        id:
+          type: string
+          format: uuid
+        minimumAbsences:
+          type: integer
+          minimum: 0
+        maximumAbsences:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Null means there is no upper absence limit.
+        paymentPercentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+
+    StipendStatus:
+      type: string
+      enum:
+        - CALCULATED
+        - NEEDS_RECALCULATION
+        - APPROVED
+        - PAID
+        - CANCELLED
+
+    ErrorResponse:
+      type: object
+      required: [timestamp, status, error, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: Request validation failed
+        path:
+          type: string
+          example: /api/v1/stipends
+        validationErrors:
+          type: object
+          additionalProperties:
+            type: string
