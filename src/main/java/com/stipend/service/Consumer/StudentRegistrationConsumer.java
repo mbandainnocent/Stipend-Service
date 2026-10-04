@@ -14,15 +14,12 @@ public class StudentRegistrationConsumer {
 
     private  final StudentEventService studentEventService;
 
-    @KafkaListener(topics = "student-registration",
-                          groupId = "stipend-service")
+    @KafkaListener(topics = "${app.kafka.topics.registration}")
 
     public void consumeStudentRegistration(StudentRegisteredEvent registeredEvent) {
-        System.out.println("Received student registration event {}: " + registeredEvent);
 
         studentEventService.processStudentRegistrationEvent(registeredEvent);
     }
 
 
 }
-
