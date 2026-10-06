@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: stipend-postgres
+    ports:
+      - "5538:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-stipenddb}
+      POSTGRES_USER: ${POSTGRES_USER:-stipend_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - stipend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stipend_app} -d ${POSTGRES_DB:-stipenddb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: stipend-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - stipend-network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+    restart: unless-stopped
+
+  attendance-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stipend-attendance-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-stipenddb}"
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-stipend_app}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-change-this-to-a-long-secure-secret-key-at-least-32-bytes}
+      APP_JWT_ACCESS_TOKEN_EXPIRATION_MS: ${APP_JWT_ACCESS_TOKEN_EXPIRATION_MS:-900000}
+      APP_JWT_REFRESH_TOKEN_EXPIRATION_MS: ${APP_JWT_REFRESH_TOKEN_EXPIRATION_MS:-604800000}
+    networks:
+      - stipend-network
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+
+networks:
+  stipend-network:
+    driver: bridge

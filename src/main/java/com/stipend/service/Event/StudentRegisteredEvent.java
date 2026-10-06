@@ -7,8 +7,6 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
-@Builder
-
 public record StudentRegisteredEvent(
         UUID eventId,
         UUID studentId,
