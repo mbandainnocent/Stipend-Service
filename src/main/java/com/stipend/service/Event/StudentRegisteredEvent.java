@@ -3,6 +3,7 @@ package com.stipend.service.Event;
 
 import java.time.Instant;
 import java.util.UUID;
+
 public record StudentRegisteredEvent(
         UUID eventId,
         UUID studentId,

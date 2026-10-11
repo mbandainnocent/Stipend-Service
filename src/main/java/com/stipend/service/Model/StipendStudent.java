@@ -63,4 +63,12 @@ public class StipendStudent {
     @Schema(description = "Timestamp when the student record was last updated")
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Schema(description = "Registration date of the student")
+    @Column(name = "registration_date")
+    private Instant registrationDate;
+
+    @Schema(description = "Version of the student record")
+    @Column(name = "version")
+    private int version;
 }

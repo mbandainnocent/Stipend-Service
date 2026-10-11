@@ -2,7 +2,6 @@ package com.stipend.service.KafkaConsumer;
 
 import com.stipend.service.Event.StudentRegisteredEvent;
 import com.stipend.service.service.StudentEventService;
-import com.stipend.service.service.StudentEventServiceImp;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,13 +19,13 @@ class StudentRegistrationEventConsumerTest {
 
 
     @Mock
-    private StudentEventServiceImp studentEventServiceImp;
+    private StudentEventService studentEventService;
 
     private StudentRegistrationEventConsumer studentRegistrationEventConsumer;
 
     @BeforeEach
     void setUp() {
-        studentRegistrationEventConsumer = new StudentRegistrationEventConsumer(studentEventServiceImp);
+        studentRegistrationEventConsumer = new StudentRegistrationEventConsumer(studentEventService);
     }
 
 
@@ -51,7 +50,7 @@ class StudentRegistrationEventConsumerTest {
         studentRegistrationEventConsumer.consume(event);
 
         // Assert
-        Mockito.verify(studentEventServiceImp)
+        Mockito.verify(studentEventService)
                 .processStudentRegistrationEvent(event);
     }
 
@@ -74,7 +73,7 @@ class StudentRegistrationEventConsumerTest {
 
         RuntimeException expectedException = new RuntimeException("Processing failed");
         Mockito.doThrow(expectedException)
-                .when(studentEventServiceImp)
+                .when(studentEventService)
                 .processStudentRegistrationEvent(event);
 
         // Act & Assert
@@ -83,7 +82,7 @@ class StudentRegistrationEventConsumerTest {
         });
 
         assertEquals("Processing failed", thrown.getMessage());
-        Mockito.verify(studentEventServiceImp)
+        Mockito.verify(studentEventService)
                 .processStudentRegistrationEvent(event);
     }
 

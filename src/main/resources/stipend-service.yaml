@@ -7,11 +7,15 @@ info:
     API used by the finance dashboard to review automatically calculated
     student stipends, approve calculated stipends, and record completed payments.
 
-    Students are created from Kafka `registration-events`. Attendance records
-    are created or updated from Kafka `attendance-events`. Monthly stipends are
-    calculated automatically by the Stipend Service scheduler. This API does not
-    allow clients to create students, submit attendance, trigger calculations,
-    or change calculated stipend amounts.
+    This document describes the intended finance REST API. Those REST endpoints
+    are not implemented yet. Students are created or updated from Kafka
+    `registration-events`; the registration event contains student and cohort
+    details, not stipend policy or allowance values. Attendance records are
+    intended to be created or updated from Kafka `attendance-events`, and
+    monthly stipends are intended to be calculated from attendance and the
+    effective cohort policy. The REST API does not allow clients to create
+    students, submit attendance, trigger calculations, or change calculated
+    stipend amounts.
   contact:
     name: Igire Rwanda Organization
     email: info@igirerwanda.org
@@ -400,6 +404,106 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
 
   schemas:
+    StudentRegisteredEvent:
+      type: object
+      description: |
+        Student and cohort details published when a student registers.
+        Stipend eligibility and allowance amounts are defined by the cohort
+        policy and are deliberately not part of this event.
+      required:
+        - eventId
+        - studentId
+        - firstName
+        - lastName
+        - programId
+        - cohortId
+        - registeredAt
+        - cohortStartDate
+        - cohortEndDate
+        - registrationDate
+        - version
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        studentId:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        programId:
+          type: string
+          format: uuid
+        cohortId:
+          type: string
+          format: uuid
+        registeredAt:
+          type: string
+          format: date-time
+        cohortStartDate:
+          type: string
+          format: date-time
+        cohortEndDate:
+          type: string
+          format: date-time
+        registrationDate:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          minimum: 1
+
+    AttendanceEvent:
+      type: object
+      description: Attendance fact published by the attendance-recording service.
+      required:
+        - eventId
+        - attendanceId
+        - studentId
+        - programId
+        - cohortId
+        - attendanceStatus
+        - attendanceDate
+        - timestamp
+        - version
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        attendanceId:
+          type: string
+          format: uuid
+        studentId:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        cohortId:
+          type: string
+          format: uuid
+        attendanceStatus:
+          $ref: '#/components/schemas/AttendanceStatus'
+        attendanceDate:
+          type: string
+          format: date
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          minimum: 1
+
+    AttendanceStatus:
+      type: string
+      enum:
+        - PRESENT
+        - ABSENT
+        - LATE
+        - EXCUSED
+
     MonthlyStipendResponse:
       type: object
       required:
