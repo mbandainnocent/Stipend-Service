@@ -15,7 +15,6 @@ buildNumber.properties
 *.iml
 *.iws
 *.ipr
-.vscode/
 .settings/
 .classpath
 .project
@@ -30,3 +29,6 @@ Thumbs.db
 # Application
 application-local.properties
 application-dev.properties
+!.env.example
+config.bat
+node_modules
