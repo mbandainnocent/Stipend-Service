@@ -1,0 +1,5 @@
+services:
+  attendance-app:
+    environment:
+      SPRING_JPA_SHOW_SQL: "true"
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL: DEBUG

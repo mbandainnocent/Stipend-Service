@@ -2,31 +2,28 @@
 
 ## Current implementation status
 
-The project has JPA entities for students, attendance, policies, tiers, monthly stipends, and processed events. Student-registration Kafka consumption, event validation, and transactional event deduplication are present. PostgreSQL is configured, but the application has not yet been verified against a running PostgreSQL instance.
+The service currently consumes student-registration events, validates and deduplicates them transactionally, and creates or updates student records. Student registration stores cohort membership and student details only; stipend rules belong to the cohort policy and are not copied from registration events. Persistence models exist for attendance, policies, tiers, monthly stipends, and processed events. Attendance persistence and monthly stipend calculation are not implemented yet.
 
 The following stories describe remaining work, the implementation order. A story is complete only when its acceptance criteria are implemented and tested.
 
-## Remaining user stories
+## Completed user stories
 
 ### US-1: Verify application behavior and local startup
-As a developer, I want repeatable test execution and documented local startup so that feature work can be validated consistently.
+Tests pass with Java 17 and Maven 3.9.9 (10 tests: 8 service tests and 2 consumer tests). Unit tests cover skipping already-processed events. Local startup with PostgreSQL and Kafka has been verified. Supported Java/Maven versions and local service setup are documented below.
 
-Acceptance criteria:
-- Run the full Maven test lifecycle successfully using the supported Java version; `mvn -q test` currently passes all 8 registration-service tests.
-- Expand tests for transactional idempotency and other implemented behavior as features are added.
-- Verify application startup using configured local PostgreSQL and Kafka services.
-- Supported Java/Maven versions and local service setup are documented below.
+### US-2: Configure the PostgreSQL connection
+PostgreSQL connection settings are supplied through environment variables, and the service has been verified to connect and persist entity data.
 
-### US-2: Verify and manage PostgreSQL persistence
-As an operator, I want the service to use persistent PostgreSQL storage with controlled schema changes so that data survives restarts and deployments are repeatable.
+- `DB_URL` defaults to `jdbc:postgresql://localhost:5432/stipenddb`.
+- `DB_USERNAME` and `DB_PASSWORD` provide credentials without committing them.
+- Local PostgreSQL setup and required environment variables are documented below.
 
-Acceptance criteria:
-- Verify startup and entity persistence against PostgreSQL using `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`.
-- Add versioned database migrations and use schema validation in production instead of Hibernate-driven schema updates.
-- Document database creation, credentials, and local startup steps without committing secrets.
+## Remaining user stories
 
 ### US-3: Consume and persist attendance events
 As the stipend service, I want attendance events recorded idempotently so that monthly calculations use reliable attendance data.
+
+The `AttendanceEvent` message type, `AttendanceRecord` entity, and `AttendanceRecordRepository` are in place. The Kafka consumer, event validation, persistence flow, and deduplication are still pending.
 
 Acceptance criteria:
 - Consume the configured attendance topic and deserialize `AttendanceEvent`.
@@ -37,6 +34,8 @@ Acceptance criteria:
 
 ### US-4: Add stipend repositories and policy validation
 As the calculation and finance services, I want queryable repositories and valid policies so that stipend rules can be selected predictably.
+
+`StipendPolicyRepository` exists with a cohort lookup. Monthly-stipend and tier repositories, effective-date selection, and policy validation are still pending.
 
 Acceptance criteria:
 - Add repositories for monthly stipends, policies, and tiers with query methods required by calculation and API use cases.
@@ -125,19 +124,24 @@ Acceptance criteria:
 ### Prerequisites
 
 - Java 17 is the project target (`maven.compiler.source` and `maven.compiler.target`). The current Maven build has been run with Maven 3.9.9; use Maven 3.9.x.
-- PostgreSQL must be available at `localhost:5432`, with a database named `stipenddb` and a user that can create/update tables.
+- PostgreSQL must be available with a database named `stipenddb` and a user that can create/update tables. The bundled Docker Compose setup publishes PostgreSQL on `localhost:5538`; a separately installed PostgreSQL can use the default `localhost:5432`.
 - Kafka must be available at `localhost:9092`. The registration consumer reads from the `registration-events` topic.
 
 ### Configure and run
 
-Set database credentials in the shell before starting the service; do not commit them:
+Start the bundled PostgreSQL and Kafka services:
+
+```sh
+docker compose up -d postgres kafka
+```
+
+For the bundled PostgreSQL container, set its default local credentials and published host port before starting the service. Override the example password for any non-local use; do not commit credentials:
 
 ```sh
 export DB_USERNAME=stipend_app
-export DB_PASSWORD='your-local-password'
-# Optional override; defaults to jdbc:postgresql://localhost:5432/stipenddb
-export DB_URL=jdbc:postgresql://localhost:5432/stipenddb
+export DB_PASSWORD='password'
+export DB_URL=jdbc:postgresql://localhost:5538/stipenddb
 mvn spring-boot:run
 ```
 
-The application defaults to `JPA_DDL_AUTO=update` for local development. For a separately managed schema, set `JPA_DDL_AUTO=validate`; production deployments should use versioned migrations. Kafka's bootstrap address is currently configured as `localhost:9092` in `src/main/resources/application.yaml`.
+For a separately installed PostgreSQL on its default port, use `DB_URL=jdbc:postgresql://localhost:5432/stipenddb`. The application defaults to `JPA_DDL_AUTO=update` for local development. For a separately managed schema, set `JPA_DDL_AUTO=validate`; production deployments should use versioned migrations. Kafka's bootstrap address is configured as `localhost:9092` in `src/main/resources/application.yaml`.
