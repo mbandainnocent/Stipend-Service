@@ -10,6 +10,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -21,7 +22,7 @@ import java.util.UUID;
 @Builder
 @Data
 @Schema(description = "Represents a student enrolled in a stipend program")
-public class StipendStudent {
+public class Student {
 
     @Id
     @Schema(description = "Unique identifier for the student")
@@ -71,4 +72,24 @@ public class StipendStudent {
     @Schema(description = "Version of the student record")
     @Column(name = "version")
     private int version;
+
+    @Schema(description = "Whether the student's cohort qualifies under its policy at cohort start")
+    @Column(name = "stipend_eligible", nullable = false, columnDefinition = "boolean default false")
+    private boolean stipendEligible;
+
+    @Schema(description = "Whether the cohort is configured for stipends by Student Registration Service")
+    @Column(name = "cohort_stipend_eligible", nullable = false, columnDefinition = "boolean default false")
+    private boolean cohortStipendEligible;
+
+    @Schema(description = "Monthly base amount supplied by Student Registration Service")
+    @Column(name = "stipend_base_amount", precision = 12, scale = 2)
+    private BigDecimal stipendBaseAmount;
+
+    @Schema(description = "Currency code supplied by Student Registration Service")
+    @Column(name = "stipend_currency", length = 3)
+    private String stipendCurrency;
+
+    @Schema(description = "Version of the latest student status event")
+    @Column(name = "status_version", nullable = false, columnDefinition = "integer default 0")
+    private int statusVersion;
 }

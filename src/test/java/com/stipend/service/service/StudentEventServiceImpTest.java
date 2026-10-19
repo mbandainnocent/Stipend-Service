@@ -50,6 +50,9 @@ class StudentEventServiceImpTest {
                 now.minus(Duration.ofDays(30)),
                 now.plus(Duration.ofDays(90)),
                 now,
+                true,
+                java.math.BigDecimal.valueOf(50000),
+                "RWF",
                 1
         );
 
@@ -158,6 +161,65 @@ class StudentEventServiceImpTest {
         );
     }
 
+    @Test
+    void processStudentRegistrationEvent_WhenEligibleWithoutAmount_ShouldThrowException() {
+        StudentRegisteredEvent invalidEvent = new StudentRegisteredEvent(
+                eventId,
+                studentId,
+                "John",
+                "Doe",
+                programId,
+                cohortId,
+                Instant.now(),
+                Instant.now(),
+                Instant.now().plus(Duration.ofDays(1)),
+                Instant.now(),
+                true,
+                null,
+                "RWF",
+                1
+        );
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> studentEventService.processStudentRegistrationEvent(invalidEvent)
+        );
+
+        assertEquals(
+                "monthlyStipendAmount must be non-negative when stipendEligible is true",
+                exception.getMessage()
+        );
+        verifyNoInteractions(processedEventService, studentRegistrationService);
+    }
+
+    @Test
+    void processStudentRegistrationEvent_WhenEligibilityFlagIsMissing_ShouldThrowException() {
+        StudentRegisteredEvent invalidEvent = new StudentRegisteredEvent(
+                eventId,
+                studentId,
+                "John",
+                "Doe",
+                programId,
+                cohortId,
+                Instant.now(),
+                Instant.now(),
+                Instant.now().plus(Duration.ofDays(1)),
+                Instant.now(),
+                null,
+                null,
+                null,
+                1
+        );
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> studentEventService.processStudentRegistrationEvent(invalidEvent)
+        );
+
+        assertEquals("stipendEligible is required", exception.getMessage());
+        verifyNoInteractions(processedEventService, studentRegistrationService);
+    }
+
     private StudentRegisteredEvent eventWith(
             UUID invalidEventId,
             UUID invalidStudentId,
@@ -178,6 +240,9 @@ class StudentEventServiceImpTest {
                 cohortStart,
                 cohortEnd,
                 now,
+                true,
+                java.math.BigDecimal.valueOf(50000),
+                "RWF",
                 version
         );
     }

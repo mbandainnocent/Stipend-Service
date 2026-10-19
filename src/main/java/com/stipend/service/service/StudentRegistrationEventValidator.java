@@ -3,6 +3,8 @@ package com.stipend.service.service;
 import com.stipend.service.Event.StudentRegisteredEvent;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+
 @Service
 public class StudentRegistrationEventValidator {
 
@@ -57,6 +59,24 @@ public class StudentRegistrationEventValidator {
 
         if (event.registrationDate() == null) {
             throw new IllegalArgumentException("registrationDate is required");
+        }
+
+        if (event.stipendEligible() == null) {
+            throw new IllegalArgumentException("stipendEligible is required");
+        }
+
+        if (event.stipendEligible()) {
+            BigDecimal amount = event.monthlyStipendAmount();
+            if (amount == null || amount.signum() < 0) {
+                throw new IllegalArgumentException(
+                        "monthlyStipendAmount must be non-negative when stipendEligible is true"
+                );
+            }
+            if (event.stipendCurrency() == null || event.stipendCurrency().isBlank()) {
+                throw new IllegalArgumentException(
+                        "stipendCurrency is required when stipendEligible is true"
+                );
+            }
         }
 
         if (event.version() < 1) {

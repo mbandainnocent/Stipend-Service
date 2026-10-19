@@ -643,8 +643,6 @@ components:
         - id
         - programId
         - cohortId
-        - baseAmount
-        - currency
         - effectiveFrom
         - enabled
         - tiers
@@ -660,16 +658,6 @@ components:
         cohortId:
           type: string
           format: uuid
-        baseAmount:
-          type: number
-          format: decimal
-          minimum: 0
-          example: 50000.00
-        currency:
-          type: string
-          minLength: 3
-          maxLength: 3
-          example: RWF
         effectiveFrom:
           type: string
           format: date

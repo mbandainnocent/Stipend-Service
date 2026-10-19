@@ -7,7 +7,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -35,12 +34,6 @@ public class StipendPolicy {
 
     @Schema(description = "Whether the policy is currently active")
     private boolean enabled;
-
-    @Schema(description = "Base amount for the stipend before adjustments")
-    private BigDecimal baseAmount;
-
-    @Schema(description = "Currency code for the stipend")
-    private String currency;
 
     @Schema(description = "Effective start date of the policy")
     private LocalDate effectiveFrom;
