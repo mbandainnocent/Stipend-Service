@@ -1,7 +1,8 @@
 package com.stipend.service.kafka.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stipend.service.Event.StudentRegisteredEvent;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -18,10 +19,11 @@ import java.util.Map;
 public class KafkaConsumerConfig {
 
     @Bean
-    public ConsumerFactory<String, StudentRegisteredEvent> studentRegistrationConsumerFactory() {
+    public ConsumerFactory<String, StudentRegisteredEvent> studentRegistrationConsumerFactory(
+            @Value("${app.kafka.consumer-groups.registration}") String registrationGroup) {
         Map<String, Object> props = new HashMap<>();
         props.put(org.apache.kafka.clients.consumer.ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        props.put(org.apache.kafka.clients.consumer.ConsumerConfig.GROUP_ID_CONFIG, "stipend-service-registration-group");
+        props.put(org.apache.kafka.clients.consumer.ConsumerConfig.GROUP_ID_CONFIG, registrationGroup);
         props.put(org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
         JsonDeserializer<StudentRegisteredEvent> deserializer = new JsonDeserializer<>(StudentRegisteredEvent.class);
@@ -37,10 +39,12 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, StudentRegisteredEvent> studentRegistrationKafkaListenerContainerFactory() {
+    public ConcurrentKafkaListenerContainerFactory<String, StudentRegisteredEvent> studentRegistrationKafkaListenerContainerFactory(
+            @Qualifier("studentRegistrationConsumerFactory")
+            ConsumerFactory<String, StudentRegisteredEvent> consumerFactory) {
         ConcurrentKafkaListenerContainerFactory<String, StudentRegisteredEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(studentRegistrationConsumerFactory());
+        factory.setConsumerFactory(consumerFactory);
         return factory;
     }
 }

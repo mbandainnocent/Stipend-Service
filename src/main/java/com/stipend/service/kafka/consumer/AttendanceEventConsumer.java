@@ -19,7 +19,7 @@ public class AttendanceEventConsumer {
 
     @KafkaListener(id = "AttendanceEvent",
     topics = "${app.kafka.topics.attendance}",
-    groupId = "${spring.kafka.consumer.group-id}",
+    groupId = "${app.kafka.consumer-groups.attendance}",
     properties = "spring.json.value.default.type=com.stipend.service.Event.AttendanceEvent")
     public void consume(AttendanceEvent event) {
 

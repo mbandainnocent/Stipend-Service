@@ -2,10 +2,7 @@ package com.stipend.service.Model;
 
 import com.stipend.service.Enum.AttendanceStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Column;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -37,6 +34,7 @@ public class AttendanceRecord {
     private UUID programId;
 
     @Schema(description = "Attendance status of the student")
+    @Enumerated(EnumType.STRING)
     private AttendanceStatus status;
 
     @Schema(description = "Date of the attendance record")

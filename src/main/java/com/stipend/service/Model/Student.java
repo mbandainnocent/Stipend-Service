@@ -1,10 +1,8 @@
 package com.stipend.service.Model;
 
+import com.stipend.service.Enum.StudentStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -53,9 +51,11 @@ public class Student {
     @Column(name = "cohort_end_date", nullable = false)
     private LocalDate cohortEndDate;
 
-    @Schema(description = "Whether the student is currently active in the program")
-    @Column(nullable = false)
-    private boolean active;
+    @Enumerated(EnumType.STRING)
+    @Schema(description = "Current enrollment status of the student")
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private StudentStatus status = StudentStatus.ACTIVE;
 
     @Schema(description = "Timestamp when the student was registered")
     @Column(name = "registered_at", nullable = false)

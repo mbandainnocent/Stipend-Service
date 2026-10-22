@@ -1,6 +1,7 @@
 package com.stipend.service.service;
 
 import com.stipend.service.Event.StudentStatusChangedEvent;
+import com.stipend.service.Enum.StudentStatus;
 import com.stipend.service.Exception.ResourceNotFoundException;
 import com.stipend.service.Model.Student;
 import com.stipend.service.Repository.StudentRegistrationRepository;
@@ -51,9 +52,11 @@ public class StudentStatusChangedEventService {
                     student.getStatusVersion()
             );
         } else {
-            boolean active = event.status() == StudentStatusChangedEvent.Status.ACTIVE;
-            student.setActive(active);
-            student.setStipendEligible(active && student.isCohortStipendEligible());
+            student.setStatus(event.status());
+            student.setStipendEligible(
+                    event.status() == StudentStatus.ACTIVE
+                            && student.isCohortStipendEligible()
+            );
             student.setStatusVersion(event.version());
             studentRepository.save(student);
         }

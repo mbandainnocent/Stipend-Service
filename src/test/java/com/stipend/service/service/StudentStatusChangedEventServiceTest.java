@@ -1,5 +1,6 @@
 package com.stipend.service.service;
 
+import com.stipend.service.Enum.StudentStatus;
 import com.stipend.service.Event.StudentStatusChangedEvent;
 import com.stipend.service.Exception.ResourceNotFoundException;
 import com.stipend.service.Model.Student;
@@ -46,7 +47,7 @@ class StudentStatusChangedEventServiceTest {
         UUID studentId = UUID.randomUUID();
         Student student = Student.builder()
                 .studentId(studentId)
-                .active(true)
+                .status(StudentStatus.ACTIVE)
                 .stipendEligible(true)
                 .cohortStipendEligible(true)
                 .stipendBaseAmount(new BigDecimal("50000.00"))
@@ -55,7 +56,7 @@ class StudentStatusChangedEventServiceTest {
         StudentStatusChangedEvent event = new StudentStatusChangedEvent(
                 eventId,
                 studentId,
-                StudentStatusChangedEvent.Status.DROPPED_OUT,
+                StudentStatus.DROPPED_OUT,
                 1
         );
         when(processedEventService.isProcessed(eventId)).thenReturn(false);
@@ -63,7 +64,7 @@ class StudentStatusChangedEventServiceTest {
 
         eventService.process(event);
 
-        assertFalse(student.isActive());
+        assertEquals(StudentStatus.DROPPED_OUT, student.getStatus());
         assertFalse(student.isStipendEligible());
         assertTrue(student.isCohortStipendEligible());
         assertEquals(new BigDecimal("50000.00"), student.getStipendBaseAmount());
@@ -78,7 +79,7 @@ class StudentStatusChangedEventServiceTest {
         UUID studentId = UUID.randomUUID();
         Student student = Student.builder()
                 .studentId(studentId)
-                .active(false)
+                .status(StudentStatus.DROPPED_OUT)
                 .stipendEligible(false)
                 .cohortStipendEligible(true)
                 .statusVersion(1)
@@ -86,7 +87,7 @@ class StudentStatusChangedEventServiceTest {
         StudentStatusChangedEvent event = new StudentStatusChangedEvent(
                 eventId,
                 studentId,
-                StudentStatusChangedEvent.Status.ACTIVE,
+                StudentStatus.ACTIVE,
                 2
         );
         when(processedEventService.isProcessed(eventId)).thenReturn(false);
@@ -94,7 +95,7 @@ class StudentStatusChangedEventServiceTest {
 
         eventService.process(event);
 
-        assertTrue(student.isActive());
+        assertEquals(StudentStatus.ACTIVE, student.getStatus());
         assertTrue(student.isStipendEligible());
         assertEquals(2, student.getStatusVersion());
         verify(studentRepository).save(student);
@@ -106,14 +107,14 @@ class StudentStatusChangedEventServiceTest {
         UUID studentId = UUID.randomUUID();
         Student student = Student.builder()
                 .studentId(studentId)
-                .active(false)
+                .status(StudentStatus.DROPPED_OUT)
                 .stipendEligible(false)
                 .statusVersion(3)
                 .build();
         StudentStatusChangedEvent event = new StudentStatusChangedEvent(
                 eventId,
                 studentId,
-                StudentStatusChangedEvent.Status.ACTIVE,
+                StudentStatus.ACTIVE,
                 2
         );
         when(processedEventService.isProcessed(eventId)).thenReturn(false);
@@ -121,7 +122,7 @@ class StudentStatusChangedEventServiceTest {
 
         eventService.process(event);
 
-        assertFalse(student.isActive());
+        assertEquals(StudentStatus.DROPPED_OUT, student.getStatus());
         assertFalse(student.isStipendEligible());
         verify(studentRepository, never()).save(any());
         verify(processedEventService).markProcessed(eventId, "STUDENT_STATUS_CHANGED");
@@ -133,7 +134,7 @@ class StudentStatusChangedEventServiceTest {
         StudentStatusChangedEvent event = new StudentStatusChangedEvent(
                 eventId,
                 UUID.randomUUID(),
-                StudentStatusChangedEvent.Status.DROPPED_OUT,
+                StudentStatus.DROPPED_OUT,
                 1
         );
         when(processedEventService.isProcessed(eventId)).thenReturn(true);
@@ -151,7 +152,7 @@ class StudentStatusChangedEventServiceTest {
         StudentStatusChangedEvent event = new StudentStatusChangedEvent(
                 eventId,
                 studentId,
-                StudentStatusChangedEvent.Status.DROPPED_OUT,
+                StudentStatus.DROPPED_OUT,
                 1
         );
         when(processedEventService.isProcessed(eventId)).thenReturn(false);

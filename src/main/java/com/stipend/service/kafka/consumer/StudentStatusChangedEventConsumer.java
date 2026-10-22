@@ -23,7 +23,7 @@ public class StudentStatusChangedEventConsumer {
     @KafkaListener(
             id = "student-status-consumer",
             topics = "${app.kafka.topics.student-status}",
-            groupId = "${spring.kafka.consumer.group-id}",
+            groupId = "${app.kafka.consumer-groups.student-status}",
             properties = "spring.json.value.default.type="
                     + "com.stipend.service.Event.StudentStatusChangedEvent"
     )

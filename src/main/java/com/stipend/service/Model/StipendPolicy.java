@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -56,4 +57,32 @@ public class StipendPolicy {
     @Schema(description = "Timestamp when the policy was last updated")
     private Instant updatedAt;
 
+    public BigDecimal getPaymentPercentageForAbsences(int absenceCount) {
+        if (absenceCount < 0) {
+            throw new IllegalArgumentException("Absence count cannot be negative");
+        }
+
+        List<StipendTier> matchingTiers = tiers.stream()
+                .filter(tier -> absenceCount >= tier.getMinimumAbsences())
+                .filter(tier -> tier.getMaximumAbsences() == null
+                        || absenceCount <= tier.getMaximumAbsences())
+                .toList();
+
+        if (matchingTiers.size() != 1) {
+            throw new IllegalStateException(
+                    "Expected exactly one stipend tier for " + absenceCount
+                            + " absences in policy " + policyId
+            );
+        }
+
+        BigDecimal percentage = matchingTiers.get(0).getPaymentPercentage();
+        if (percentage == null || percentage.compareTo(BigDecimal.ZERO) < 0
+                || percentage.compareTo(new BigDecimal("100")) > 0) {
+            throw new IllegalStateException(
+                    "Invalid payment percentage for " + absenceCount
+                            + " absences in policy " + policyId
+            );
+        }
+        return percentage;
+    }
 }
