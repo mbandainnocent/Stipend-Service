@@ -66,11 +66,24 @@ public class AttendanceEventServiceImpl implements AttendanceEventService {
                 LocalDateTime.ofInstant(event.timestamp(), ZoneOffset.UTC);
 
         AttendanceRecord record = attendanceRecordRepository
-                .findById(event.attendanceId())
+                .findByIdForUpdate(event.attendanceId())
                 .orElseGet(() -> AttendanceRecord.builder()
                         .attendanceId(event.attendanceId())
                         .createdAt(eventTime)
                         .build());
+
+        if (event.version() <= record.getEventVersion()) {
+            logger.info(
+                    "Ignoring stale attendance event {} at version {} for attendance {} "
+                            + "with current version {}",
+                    event.eventId(),
+                    event.version(),
+                    event.attendanceId(),
+                    record.getEventVersion()
+            );
+            processedEventService.markProcessed(event.eventId(), EVENT_TYPE);
+            return;
+        }
 
         record.setStudentId(event.studentId());
         record.setProgramId(event.programId());
@@ -78,8 +91,9 @@ public class AttendanceEventServiceImpl implements AttendanceEventService {
         record.setStatus(event.attendanceStatus());
         record.setDate(event.attendanceDate());
         record.setUpdatedAt(eventTime);
+        record.setEventVersion(event.version());
 
-        attendanceRecordRepository.save(record);
+        attendanceRecordRepository.saveAndFlush(record);
         processedEventService.markProcessed(event.eventId(), EVENT_TYPE);
     }
 }

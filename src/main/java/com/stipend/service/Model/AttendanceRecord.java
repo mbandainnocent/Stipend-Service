@@ -45,4 +45,7 @@ public class AttendanceRecord {
 
     @Schema(description = "Timestamp when the record was last updated")
     private LocalDateTime updatedAt;
+
+    @Column(name = "event_version", nullable = false, columnDefinition = "integer default 0")
+    private int eventVersion;
 }

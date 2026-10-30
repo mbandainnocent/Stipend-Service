@@ -32,6 +32,9 @@ public class AttendanceEventConsumer {
                     event == null ? null : event.eventId(),
                     e
             );
+            if (e instanceof IllegalArgumentException invalidEvent) {
+                throw invalidEvent;
+            }
             throw new RuntimeException(
                     "Failed to process attendance event "
                             + (event == null ? null : event.eventId()),

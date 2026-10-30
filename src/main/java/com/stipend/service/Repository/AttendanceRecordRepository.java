@@ -2,6 +2,8 @@ package com.stipend.service.Repository;
 
 import com.stipend.service.Enum.AttendanceStatus;
 import com.stipend.service.Model.AttendanceRecord;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +15,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AttendanceRecordRepository extends JpaRepository<AttendanceRecord, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select attendance from AttendanceRecord attendance "
+            + "where attendance.attendanceId = :attendanceId")
+    Optional<AttendanceRecord> findByIdForUpdate(
+            @Param("attendanceId") UUID attendanceId
+    );
+
     @Query("""
             select distinct attendance.date
             from AttendanceRecord attendance
