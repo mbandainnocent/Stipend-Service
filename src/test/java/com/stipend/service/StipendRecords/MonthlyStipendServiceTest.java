@@ -74,6 +74,7 @@ class MonthlyStipendServiceTest {
         );
         policy = StipendPolicy.builder()
                 .policyId(UUID.randomUUID())
+                .effectiveFrom(LocalDate.of(2026, 1, 1))
                 .tiers(List.of(
                         tier(0, 2, "100.00"),
                         tier(3, 3, "50.00"),

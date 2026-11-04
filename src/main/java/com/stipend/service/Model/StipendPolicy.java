@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -84,5 +85,65 @@ public class StipendPolicy {
             );
         }
         return percentage;
+    }
+
+    public void validate() {
+        if (effectiveFrom == null) {
+            throw new IllegalArgumentException("Policy effectiveFrom is required");
+        }
+        if (effectiveTo != null && effectiveTo.isBefore(effectiveFrom)) {
+            throw new IllegalArgumentException(
+                    "Policy effectiveTo cannot be before effectiveFrom"
+            );
+        }
+        if (tiers == null || tiers.isEmpty()) {
+            throw new IllegalArgumentException("Policy must define at least one stipend tier");
+        }
+        if (tiers.stream().anyMatch(tier -> tier == null)) {
+            throw new IllegalArgumentException("Policy tiers cannot contain null entries");
+        }
+
+        List<StipendTier> orderedTiers = tiers.stream()
+                .sorted(Comparator.comparingInt(StipendTier::getMinimumAbsences))
+                .toList();
+        long expectedMinimum = 0;
+        for (int index = 0; index < orderedTiers.size(); index++) {
+            StipendTier tier = orderedTiers.get(index);
+            if (tier.getMinimumAbsences() < 0) {
+                throw new IllegalArgumentException("Tier minimumAbsences cannot be negative");
+            }
+            if (tier.getMaximumAbsences() != null
+                    && tier.getMaximumAbsences() < tier.getMinimumAbsences()) {
+                throw new IllegalArgumentException(
+                        "Tier maximumAbsences cannot be below minimumAbsences"
+                );
+            }
+            BigDecimal percentage = tier.getPaymentPercentage();
+            if (percentage == null || percentage.compareTo(BigDecimal.ZERO) < 0
+                    || percentage.compareTo(new BigDecimal("100")) > 0) {
+                throw new IllegalArgumentException(
+                        "Tier paymentPercentage must be between 0 and 100"
+                );
+            }
+            if (tier.getMinimumAbsences() != expectedMinimum) {
+                throw new IllegalArgumentException(
+                        "Stipend tiers must be contiguous and non-overlapping from zero absences"
+                );
+            }
+            if (tier.getMaximumAbsences() == null) {
+                if (index != orderedTiers.size() - 1) {
+                    throw new IllegalArgumentException(
+                            "An unbounded tier must be the final stipend tier"
+                    );
+                }
+            } else {
+                expectedMinimum = tier.getMaximumAbsences() + 1;
+            }
+        }
+        if (orderedTiers.get(orderedTiers.size() - 1).getMaximumAbsences() != null) {
+            throw new IllegalArgumentException(
+                    "Final stipend tier must cover all remaining absence counts"
+            );
+        }
     }
 }

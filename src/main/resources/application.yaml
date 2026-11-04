@@ -44,3 +44,7 @@ app:
 
   registration:
     business-time-zone: Africa/Kigali
+
+  stipend:
+    calculation:
+      cron: "0 0 2 L * *"

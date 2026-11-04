@@ -128,6 +128,7 @@ public class MonthlyStipendService {
                         "No effective stipend policy for cohort " + student.getCohortId()
                                 + " on " + calculationStart
                 ));
+        policy.validate();
         BigDecimal percentage = policy.getPaymentPercentageForAbsences(Math.toIntExact(absences));
         BigDecimal calculatedAmount = baseAmount
                 .multiply(BigDecimal.valueOf(presentDays))

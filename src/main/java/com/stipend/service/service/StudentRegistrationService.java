@@ -92,6 +92,7 @@ public class StudentRegistrationService {
                 .updatedAt(Instant.now())
                 .build();
         policy.getTiers().forEach(tier -> tier.setPolicy(policy));
+        policy.validate();
         stipendPolicyRepository.save(policy);
     }
 
