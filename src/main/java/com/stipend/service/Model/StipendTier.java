@@ -4,8 +4,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -15,7 +16,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Data
+@Getter
+@Setter
 @Schema(description = "Represents a payment tier within a stipend policy based on absence thresholds")
 public class StipendTier {
     @Id
@@ -25,7 +27,7 @@ public class StipendTier {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "policy_id", nullable = false)
-    @Schema(description = "The stipend policy this tier belongs to")
+    @Schema(hidden = true)
     private StipendPolicy policy;
 
     @Column(name = "minimum_absences", nullable = false)

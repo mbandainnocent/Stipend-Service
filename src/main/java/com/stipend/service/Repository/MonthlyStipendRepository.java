@@ -3,8 +3,10 @@ package com.stipend.service.Repository;
 import com.stipend.service.Model.MonthlyStipend;
 import com.stipend.service.Model.MonthlyStipendFinanceView;
 import com.stipend.service.Enum.StipendStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,6 +17,10 @@ import java.util.UUID;
 
 @Repository
 public interface MonthlyStipendRepository extends JpaRepository<MonthlyStipend, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select stipend from MonthlyStipend stipend where stipend.id = :stipendId")
+    Optional<MonthlyStipend> findByIdForUpdate(@Param("stipendId") UUID stipendId);
+
     Optional<MonthlyStipend> findByStudentIdAndStipendYearAndStipendMonth(
             UUID studentId,
             int stipendYear,
@@ -66,11 +72,22 @@ public interface MonthlyStipendRepository extends JpaRepository<MonthlyStipend, 
                         student.cohortId,
                         student.cohortStartDate,
                         student.cohortEndDate,
+                        stipend.policyId,
                         stipend.stipendYear,
                         stipend.stipendMonth,
+                        stipend.absenceCount,
+                        stipend.baseAmount,
+                        stipend.paymentPercentage,
                         stipend.calculatedAmount,
                         stipend.currency,
-                        stipend.status
+                        stipend.status,
+                        stipend.approvedBy,
+                        stipend.approvalComment,
+                        stipend.approvedAt,
+                        stipend.paymentReference,
+                        stipend.paidAt,
+                        stipend.calculatedAt,
+                        stipend.updatedAt
                     )
                     from MonthlyStipend stipend
                     join Student student on student.studentId = stipend.studentId
@@ -99,6 +116,4 @@ public interface MonthlyStipendRepository extends JpaRepository<MonthlyStipend, 
             @Param("status") StipendStatus status,
             Pageable pageable
     );
-
-    boolean existsByStipendYearAndStipendMonth(int stipendYear, int stipendMonth);
 }

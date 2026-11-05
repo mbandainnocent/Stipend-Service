@@ -1,5 +1,6 @@
 package com.stipend.service.StipendRecords;
 
+import com.stipend.service.Repository.StudentRegistrationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,63 +9,69 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.Date;
 import java.util.Objects;
+import java.util.Optional;
 
 @Component
 public class MonthlyStipendCalculation {
 
     private static final Logger log = LoggerFactory.getLogger(MonthlyStipendCalculation.class);
 
-    private final MonthlyStipendService monthlyStipendService;
+    private final MonthlyStipendPeriodRunner periodRunner;
+    private final StudentRegistrationRepository studentRepository;
     private final String businessTimeZone;
 
     public MonthlyStipendCalculation(
-            MonthlyStipendService monthlyStipendService,
+            MonthlyStipendPeriodRunner periodRunner,
+            StudentRegistrationRepository studentRepository,
             @Value("${app.registration.business-time-zone:Africa/Kigali}") String businessTimeZone
     ) {
-        this.monthlyStipendService = monthlyStipendService;
+        this.periodRunner = periodRunner;
+        this.studentRepository = studentRepository;
         this.businessTimeZone = businessTimeZone;
     }
 
     public void scheduleMonthlyCalculation() {
-        ZonedDateTime now = ZonedDateTime.now(ZoneId.of(businessTimeZone));
-        calculateForMonth(YearMonth.from(now));
+        calculateCompletedPeriods(LocalDate.now(ZoneId.of(businessTimeZone)));
     }
 
-    public void scheduleMonthlyCalculation(Date cutOffDate) {
-        Objects.requireNonNull(cutOffDate, "cutOffDate must not be null");
+    void calculateCompletedPeriods(LocalDate today) {
+        Objects.requireNonNull(today, "today must not be null");
+        Optional<LocalDate> earliestCohortStart = studentRepository.findEarliestCohortStartDate();
+        if (earliestCohortStart.isEmpty()) {
+            log.info("No student cohorts are registered; skipping scheduled stipend calculations");
+            return;
+        }
 
-        LocalDate cutoffLocal = cutOffDate.toInstant()
-                .atZone(ZoneId.of(businessTimeZone))
-                .toLocalDate();
+        YearMonth earliestPeriod = YearMonth.from(earliestCohortStart.get());
+        YearMonth latestCompletedPeriod = YearMonth.from(today.minusMonths(1));
+        if (today.getDayOfMonth() == 1) {
+            latestCompletedPeriod = latestCompletedPeriod.minusMonths(1);
+        }
 
-        log.info("Starting manual monthly stipend calculation with cutoff date: {}", cutoffLocal);
+        if (earliestPeriod.isAfter(latestCompletedPeriod)) {
+            log.info("No fully closed stipend periods are available to calculate");
+            return;
+        }
 
-        calculateForMonth(YearMonth.from(cutoffLocal));
-    }
-
-    private void calculateForMonth(YearMonth period) {
-        log.info("Starting monthly stipend calculation for period: {}", period);
-        try {
-            long startTime = System.currentTimeMillis();
-            var stipends = monthlyStipendService.calculateMonthlyStipend(period);
-            long duration = System.currentTimeMillis() - startTime;
-
-            log.info(
-                    "Monthly stipend calculation completed for period: {}. Records created/updated: {}. Duration: {}ms",
-                    period,
-                    stipends.size(),
-                    duration
-            );
-
-            if (stipends.isEmpty()) {
-                log.warn("No stipend records were calculated for period: {}. This may indicate no eligible students or no attendance data.", period);
+        for (YearMonth period = earliestPeriod;
+             !period.isAfter(latestCompletedPeriod);
+             period = period.plusMonths(1)) {
+            boolean isMostRecentlyClosedPeriod = period.equals(latestCompletedPeriod);
+            try {
+                boolean calculated = periodRunner.calculateIfNeeded(
+                        period,
+                        today,
+                        isMostRecentlyClosedPeriod
+                );
+                if (calculated) {
+                    log.info("Scheduled stipend calculation recorded for period {}", period);
+                }
+            } catch (RuntimeException exception) {
+                log.error("Scheduled stipend calculation failed for period {}", period, exception);
+                throw exception;
             }
-        } catch (Exception e) {
-            log.error("Failed to calculate monthly stipends for period: {}", period, e);
-            throw e;
         }
     }
+
 }

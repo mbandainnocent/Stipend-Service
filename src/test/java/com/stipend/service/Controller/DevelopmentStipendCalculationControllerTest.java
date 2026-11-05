@@ -1,8 +1,10 @@
 package com.stipend.service.Controller;
 
 import com.stipend.service.Enum.StipendStatus;
+import com.stipend.service.DTO.CalculationResultDTO;
 import com.stipend.service.Model.MonthlyStipend;
 import com.stipend.service.StipendRecords.MonthlyStipendService;
+import com.stipend.service.service.DevelopmentStipendService;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -35,11 +37,11 @@ class DevelopmentStipendCalculationControllerTest {
                         .build()
         ));
 
-        var result = new DevelopmentStipendCalculationController(stipendService)
+        var result = new DevelopmentStipendCalculationController(stipendService, mock(DevelopmentStipendService.class))
                 .calculate(period);
 
         assertThat(result).containsExactly(
-                new DevelopmentStipendCalculationController.CalculationResult(
+                new CalculationResultDTO(
                         studentId,
                         cohortId,
                         2025,
@@ -50,5 +52,50 @@ class DevelopmentStipendCalculationControllerTest {
                 )
         );
         verify(stipendService).calculateMonthlyStipend(period);
+    }
+
+    @Test
+    void getStipendsCalculatesAndReturnsFinanceRowsForCurrentMonth() {
+        MonthlyStipendService stipendService = mock(MonthlyStipendService.class);
+        DevelopmentStipendService developmentStipendService = mock(DevelopmentStipendService.class);
+        YearMonth currentMonth = YearMonth.now();
+        var response = List.of(
+                new com.stipend.service.DTO.MonthlyStipendResponseDTO(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "Aline",
+                        "Uwase",
+                        UUID.randomUUID(),
+                        java.time.LocalDate.of(2026, 1, 1),
+                        java.time.LocalDate.of(2026, 12, 31),
+                        UUID.randomUUID(),
+                        currentMonth.getYear(),
+                        currentMonth.getMonthValue(),
+                        currentMonth.atDay(1),
+                        currentMonth.atEndOfMonth(),
+                        0,
+                        new BigDecimal("40000.00"),
+                        new BigDecimal("100.00"),
+                        new BigDecimal("40000.00"),
+                        "RWF",
+                        StipendStatus.CALCULATED,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        java.time.Instant.now(),
+                        java.time.Instant.now()
+                )
+        );
+        when(developmentStipendService.calculateAndGetCurrentMonthStipends()).thenReturn(response);
+        DevelopmentStipendCalculationController controller =
+                new DevelopmentStipendCalculationController(stipendService, developmentStipendService);
+
+        var result = controller.getStipends();
+
+        assertThat(result.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.OK);
+        assertThat(result.getBody()).isEqualTo(response);
+        verify(developmentStipendService).calculateAndGetCurrentMonthStipends();
     }
 }

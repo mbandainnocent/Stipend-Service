@@ -10,8 +10,8 @@ import static org.mockito.Mockito.verify;
 class MonthlyStipendSchedulerTest {
 
     @Test
-    void lastDayCronIsValid() {
-        assertNotNull(CronExpression.parse("0 0 2 L * *"));
+    void dailyCronIsValid() {
+        assertNotNull(CronExpression.parse("0 0 2 * * *"));
     }
 
     @Test

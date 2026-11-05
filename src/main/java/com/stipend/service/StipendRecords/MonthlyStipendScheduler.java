@@ -13,7 +13,7 @@ public class MonthlyStipendScheduler {
     }
 
     @Scheduled(
-            cron = "${app.stipend.calculation.cron:0 0 2 L * *}",
+            cron = "${app.stipend.calculation.cron:0 0 2 * * *}",
             zone = "${app.registration.business-time-zone:Africa/Kigali}"
     )
     public void calculateMonthlyStipends() {

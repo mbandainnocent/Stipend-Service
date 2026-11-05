@@ -7,8 +7,9 @@ info:
     API used by the finance dashboard to review automatically calculated
     student stipends, approve calculated stipends, and record completed payments.
 
-    This document describes the intended finance REST API. Those REST endpoints
-    are not implemented yet. Students are created or updated from Kafka
+    This document describes the finance REST API contract. Stipend and policy
+    read endpoints and approval/payment operations are implemented; JWT
+    authorization remains planned work. Students are created or updated from Kafka
     `registration-events`; the registration event contains student and cohort
     details, not stipend policy or allowance values. Attendance records are
     intended to be created or updated from Kafka `attendance-events`, and
@@ -87,6 +88,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MonthlyStipendResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -111,6 +114,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/MonthlyStipendResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -172,6 +177,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MonthlyStipendResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -249,6 +256,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/StipendPolicyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -268,6 +277,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StipendPolicyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -509,8 +520,11 @@ components:
       required:
         - id
         - studentId
-        - studentName
+        - firstName
+        - lastName
         - cohortId
+        - stipendPeriodStartDate
+        - stipendPeriodEndDate
         - policyId
         - stipendYear
         - stipendMonth
@@ -529,12 +543,21 @@ components:
         studentId:
           type: string
           format: uuid
-        studentName:
+        firstName:
           type: string
-          example: Aline Uwase
+          example: Aline
+        lastName:
+          type: string
+          example: Uwase
         cohortId:
           type: string
           format: uuid
+        cohortStartDate:
+          type: string
+          format: date
+        cohortEndDate:
+          type: string
+          format: date
         policyId:
           type: string
           format: uuid
@@ -546,6 +569,14 @@ components:
           minimum: 1
           maximum: 12
           example: 8
+        stipendPeriodStartDate:
+          type: string
+          format: date
+          description: First calendar day of the stipend month.
+        stipendPeriodEndDate:
+          type: string
+          format: date
+          description: Last calendar day of the stipend month.
         absenceCount:
           type: integer
           minimum: 0
@@ -565,8 +596,10 @@ components:
           format: decimal
           minimum: 0
           example: 37500.00
+          description: Final attendance-adjusted amount, rounded to two decimal places using HALF_UP.
         currency:
           type: string
+          description: ISO 4217 currency code supplied with the student's cohort stipend settings.
           example: RWF
         status:
           $ref: '#/components/schemas/StipendStatus'
@@ -632,6 +665,8 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+          pattern: '\S'
+          description: Must contain at least one non-whitespace character.
           example: MTN-2026-08-000123
         paidAt:
           type: string

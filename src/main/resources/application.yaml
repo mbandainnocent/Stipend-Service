@@ -47,4 +47,4 @@ app:
 
   stipend:
     calculation:
-      cron: "0 0 2 L * *"
+      cron: "0 0 2 * * *"
