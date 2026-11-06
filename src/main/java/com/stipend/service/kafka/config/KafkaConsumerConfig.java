@@ -9,6 +9,7 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 import java.util.HashMap;
@@ -20,9 +21,13 @@ public class KafkaConsumerConfig {
 
     @Bean
     public ConsumerFactory<String, StudentRegisteredEvent> studentRegistrationConsumerFactory(
+            @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
             @Value("${app.kafka.consumer-groups.registration}") String registrationGroup) {
         Map<String, Object> props = new HashMap<>();
-        props.put(org.apache.kafka.clients.consumer.ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(
+                org.apache.kafka.clients.consumer.ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                bootstrapServers
+        );
         props.put(org.apache.kafka.clients.consumer.ConsumerConfig.GROUP_ID_CONFIG, registrationGroup);
         props.put(org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
@@ -34,7 +39,7 @@ public class KafkaConsumerConfig {
         return new DefaultKafkaConsumerFactory<>(
                 props,
                 new org.apache.kafka.common.serialization.StringDeserializer(),
-                deserializer
+                new ErrorHandlingDeserializer<>(deserializer)
         );
     }
 

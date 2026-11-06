@@ -11,6 +11,9 @@ END
 $$;
 
 ALTER TABLE stipend_attendance
+    DROP CONSTRAINT IF EXISTS stipend_attendance_status_check;
+
+ALTER TABLE stipend_attendance
     ALTER COLUMN status TYPE VARCHAR(20)
     USING CASE status
         WHEN 0 THEN 'PRESENT'
