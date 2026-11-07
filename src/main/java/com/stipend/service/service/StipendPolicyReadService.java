@@ -51,11 +51,10 @@ public class StipendPolicyReadService {
 
     private StipendPolicyResponseDTO toResponse(StipendPolicy policy) {
         List<StipendTierResponseDTO> tiers = policy.getTiers().stream()
-                .sorted(Comparator.comparingInt(StipendTier::getMinimumAbsences))
+                .sorted(Comparator.comparing(StipendTier::getMinimumAttendancePercentage))
                 .map(tier -> new StipendTierResponseDTO(
                         tier.getId(),
-                        tier.getMinimumAbsences(),
-                        tier.getMaximumAbsences(),
+                        tier.getMinimumAttendancePercentage(),
                         tier.getPaymentPercentage()
                 ))
                 .toList();

@@ -111,11 +111,12 @@ class MonthlyStipendConcurrencyIntegrationTest {
                 .cohortId(cohortId)
                 .enabled(true)
                 .effectiveFrom(LocalDate.of(2025, 1, 1))
-                .tiers(List.of(StipendTier.builder()
-                        .minimumAbsences(0)
-                        .maximumAbsences(null)
-                        .paymentPercentage(new BigDecimal("100.00"))
-                        .build()))
+                .tiers(List.of(
+                        tier("0", "50.00"),
+                        tier("85", "75.00"),
+                        tier("90", "90.00"),
+                        tier("95", "100.00")
+                ))
                 .createdAt(Instant.parse("2025-01-01T00:00:00Z"))
                 .updatedAt(Instant.parse("2025-01-01T00:00:00Z"))
                 .build();
@@ -162,10 +163,15 @@ class MonthlyStipendConcurrencyIntegrationTest {
             assertThat(record.getPolicyId()).isEqualTo(policy.getPolicyId());
             assertThat(record.getStipendYear()).isEqualTo(PERIOD.getYear());
             assertThat(record.getStipendMonth()).isEqualTo(PERIOD.getMonthValue());
-            assertThat(record.getAbsenceCount()).isEqualTo(1);
+            assertThat(record.getAbsenceCount()).isEqualByComparingTo("1");
+            assertThat(record.getScheduledTrainingDays()).isEqualTo(4);
+            assertThat(record.getEligibleTrainingDays()).isEqualTo(3);
+            assertThat(record.getCreditedAttendanceDays()).isEqualByComparingTo("2");
+            assertThat(record.getAttendancePercentage()).isEqualByComparingTo("66.67");
+            assertThat(record.getUnauthorizedAbsenceDays()).isEqualByComparingTo("1");
             assertThat(record.getBaseAmount()).isEqualByComparingTo("40000.00");
-            assertThat(record.getPaymentPercentage()).isEqualByComparingTo("100.00");
-            assertThat(record.getCalculatedAmount()).isEqualByComparingTo("20000.00");
+            assertThat(record.getPaymentPercentage()).isEqualByComparingTo("50.00");
+            assertThat(record.getCalculatedAmount()).isEqualByComparingTo("15000.00");
             assertThat(record.getCurrency()).isEqualTo("RWF");
             assertThat(record.getStatus()).isEqualTo(StipendStatus.CALCULATED);
             assertThat(record.getCalculatedAt()).isNotNull();
@@ -193,6 +199,13 @@ class MonthlyStipendConcurrencyIntegrationTest {
                 .createdAt(LocalDateTime.of(date, java.time.LocalTime.NOON))
                 .updatedAt(LocalDateTime.of(date, java.time.LocalTime.NOON))
                 .build());
+    }
+
+    private StipendTier tier(String minimumAttendance, String percentage) {
+        return StipendTier.builder()
+                .minimumAttendancePercentage(new BigDecimal(minimumAttendance))
+                .paymentPercentage(new BigDecimal(percentage))
+                .build();
     }
 
     private boolean hasPostgresUniqueViolation(Throwable throwable) {

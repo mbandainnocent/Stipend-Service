@@ -3,6 +3,7 @@ package com.stipend.service.StipendRecords;
 import com.stipend.service.Enum.AttendanceStatus;
 import com.stipend.service.Enum.StipendStatus;
 import com.stipend.service.Enum.StudentStatus;
+import com.stipend.service.Model.AttendanceRecord;
 import com.stipend.service.Model.MonthlyStipend;
 import com.stipend.service.Model.StipendPolicy;
 import com.stipend.service.Model.StipendTier;
@@ -14,28 +15,22 @@ import com.stipend.service.Repository.StudentRegistrationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -45,24 +40,20 @@ class MonthlyStipendServiceTest {
     private static final YearMonth PERIOD = YearMonth.of(2026, 5);
     private static final LocalDate PERIOD_START = PERIOD.atDay(1);
     private static final LocalDate PERIOD_END = PERIOD.atEndOfMonth();
-    private static final Set<AttendanceStatus> ABSENCE_STATUSES =
-            Set.of(AttendanceStatus.ABSENT, AttendanceStatus.LATE);
 
     @Mock
     private StudentRegistrationRepository studentRepository;
-
     @Mock
     private AttendanceRecordRepository attendanceRepository;
-
     @Mock
     private MonthlyStipendRepository stipendRepository;
-
     @Mock
     private StipendPolicyRepository policyRepository;
 
     private MonthlyStipendService service;
     private Student student;
     private StipendPolicy policy;
+    private List<LocalDate> classDates;
 
     @BeforeEach
     void setUp() {
@@ -70,17 +61,9 @@ class MonthlyStipendServiceTest {
                 studentRepository,
                 attendanceRepository,
                 stipendRepository,
-                policyRepository
+                policyRepository,
+                "Africa/Kigali"
         );
-        policy = StipendPolicy.builder()
-                .policyId(UUID.randomUUID())
-                .effectiveFrom(LocalDate.of(2026, 1, 1))
-                .tiers(List.of(
-                        tier(0, 2, "100.00"),
-                        tier(3, 3, "50.00"),
-                        tier(4, null, "0.00")
-                ))
-                .build();
         student = Student.builder()
                 .studentId(UUID.randomUUID())
                 .cohortId(UUID.randomUUID())
@@ -91,138 +74,198 @@ class MonthlyStipendServiceTest {
                 .stipendBaseAmount(new BigDecimal("50000.00"))
                 .stipendCurrency("RWF")
                 .build();
-        policy.setCohortId(student.getCohortId());
-
-        List<LocalDate> classDates = IntStream.rangeClosed(1, 20)
+        policy = StipendPolicy.builder()
+                .policyId(UUID.randomUUID())
+                .cohortId(student.getCohortId())
+                .effectiveFrom(LocalDate.of(2026, 1, 1))
+                .tiers(List.of(
+                        tier("0", "50"),
+                        tier("85", "75"),
+                        tier("90", "90"),
+                        tier("95", "100")
+                ))
+                .build();
+        classDates = IntStream.rangeClosed(1, 20)
                 .mapToObj(day -> LocalDate.of(2026, 5, day))
                 .toList();
+
         lenient().when(studentRepository.findByStatusAndStipendEligibleTrue(StudentStatus.ACTIVE))
                 .thenReturn(List.of(student));
         lenient().when(attendanceRepository.findDistinctAttendanceDatesByCohortIdAndDateBetween(
                 student.getCohortId(), PERIOD_START, PERIOD_END
         )).thenReturn(classDates);
-        lenient().when(attendanceRepository.findFirstAttendanceDateByStudentIdAndCohortIdAndStatusAndDateBetween(
-                student.getStudentId(),
-                student.getCohortId(),
-                AttendanceStatus.PRESENT,
-                student.getCohortStartDate(),
-                PERIOD_END
-        )).thenReturn(Optional.of(PERIOD_START));
-        lenient().when(attendanceRepository
-                .countDistinctAttendanceDatesByStudentIdAndCohortIdAndStatusAndDateBetween(
-                        student.getStudentId(),
-                        student.getCohortId(),
-                        AttendanceStatus.PRESENT,
-                        PERIOD_START,
-                        PERIOD_END
-                )).thenReturn(20L);
-        lenient().when(attendanceRepository
-                .countDistinctAttendanceDatesByStudentIdAndCohortIdAndDateBetweenAndStatusIn(
-                        student.getStudentId(),
-                        student.getCohortId(),
-                        PERIOD_START,
-                        PERIOD_END,
-                        ABSENCE_STATUSES
-                )).thenReturn(0L);
-        lenient().when(stipendRepository.findByStudentIdAndStipendYearAndStipendMonth(
-                student.getStudentId(), 2026, 5
-        )).thenReturn(Optional.empty());
         lenient().when(policyRepository.findEffectivePolicyForCohort(
                 student.getCohortId(), PERIOD_START
         )).thenReturn(Optional.of(policy));
+        lenient().when(attendanceRepository.findByStudentIdAndCohortIdAndDateBetween(
+                student.getStudentId(), student.getCohortId(), PERIOD_START, PERIOD_END
+        )).thenReturn(recordsFor(List.of(AttendanceStatus.PRESENT), 20));
+        lenient().when(stipendRepository.findByStudentIdAndStipendYearAndStipendMonth(
+                student.getStudentId(), 2026, 5
+        )).thenReturn(Optional.empty());
         lenient().when(stipendRepository.save(any(MonthlyStipend.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
-    void calculatesTierAdjustedPaymentForAbsences() {
-        stubAbsences(3);
+    void paysFullBaseAmountAtNinetyFivePercentAttendance() {
+        setStatuses(19, AttendanceStatus.PRESENT, 1, AttendanceStatus.ABSENT);
 
         MonthlyStipend stipend = calculateOne();
 
-        assertEquals(3, stipend.getAbsenceCount());
-        assertEquals(new BigDecimal("50.00"), stipend.getPaymentPercentage());
-        assertEquals(new BigDecimal("25000.00"), stipend.getCalculatedAmount());
-        assertEquals(StipendStatus.CALCULATED, stipend.getStatus());
-    }
-
-    @Test
-    void countsPresentDaysAndThenAppliesAttendancePolicy() {
-        stubPresentDays(12);
-        stubAbsences(3);
-
-        MonthlyStipend stipend = calculateOne();
-
-        assertEquals(3, stipend.getAbsenceCount());
-        assertEquals(new BigDecimal("50.00"), stipend.getPaymentPercentage());
-        assertEquals(new BigDecimal("15000.00"), stipend.getCalculatedAmount());
-    }
-
-    @Test
-    void startsCountingPresentDaysOnTheFirstPresentDateInclusive() {
-        LocalDate activationDate = LocalDate.of(2026, 5, 15);
-        stubFirstPresent(activationDate);
-        stubPresentDays(6, activationDate, PERIOD_END);
-        stubAbsences(0, activationDate, PERIOD_END);
-        when(policyRepository.findEffectivePolicyForCohort(
-                student.getCohortId(), activationDate
-        )).thenReturn(Optional.of(policy));
-
-        MonthlyStipend stipend = calculateOne();
-
-        assertEquals(new BigDecimal("15000.00"), stipend.getCalculatedAmount());
-        verify(attendanceRepository)
-                .countDistinctAttendanceDatesByStudentIdAndCohortIdAndStatusAndDateBetween(
-                        student.getStudentId(),
-                        student.getCohortId(),
-                        AttendanceStatus.PRESENT,
-                        activationDate,
-                        PERIOD_END
-                );
-    }
-
-    @Test
-    void limitsMonthlyCohortClassDatesToInclusiveCohortBounds() {
-        LocalDate cohortStart = LocalDate.of(2026, 5, 10);
-        LocalDate cohortEnd = LocalDate.of(2026, 5, 20);
-        student.setCohortStartDate(cohortStart);
-        student.setCohortEndDate(cohortEnd);
-        when(attendanceRepository.findDistinctAttendanceDatesByCohortIdAndDateBetween(
-                student.getCohortId(), cohortStart, cohortEnd
-        )).thenReturn(IntStream.rangeClosed(10, 20)
-                .mapToObj(day -> LocalDate.of(2026, 5, day))
-                .toList());
-        stubFirstPresent(cohortStart, cohortStart, cohortEnd);
-        stubPresentDays(11, cohortStart, cohortEnd);
-        stubAbsences(0, cohortStart, cohortEnd);
-        when(policyRepository.findEffectivePolicyForCohort(
-                student.getCohortId(), cohortStart
-        )).thenReturn(Optional.of(policy));
-
-        MonthlyStipend stipend = calculateOne();
-
+        assertEquals(20, stipend.getScheduledTrainingDays());
+        assertEquals(20, stipend.getEligibleTrainingDays());
+        assertEquals(new BigDecimal("19"), stipend.getCreditedAttendanceDays());
+        assertEquals(new BigDecimal("95.000000"), stipend.getAttendancePercentage());
+        assertEquals(new BigDecimal("100"), stipend.getPaymentPercentage());
         assertEquals(new BigDecimal("50000.00"), stipend.getCalculatedAmount());
-        verify(attendanceRepository).findDistinctAttendanceDatesByCohortIdAndDateBetween(
-                student.getCohortId(), cohortStart, cohortEnd
-        );
     }
 
     @Test
-    void skipsStudentsWithoutAnyPresentAttendanceInThePeriod() {
-        when(attendanceRepository.findFirstAttendanceDateByStudentIdAndCohortIdAndStatusAndDateBetween(
+    void appliesNinetyPercentTierAtNinetyPercentAttendance() {
+        setStatuses(18, AttendanceStatus.PRESENT, 2, AttendanceStatus.ABSENT);
+
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(new BigDecimal("90"), stipend.getPaymentPercentage());
+        assertEquals(new BigDecimal("45000.00"), stipend.getCalculatedAmount());
+    }
+
+    @Test
+    void appliesNinetyPercentTierToOneAbsenceInAnEighteenDayMonth() {
+        classDates = IntStream.rangeClosed(1, 18)
+                .mapToObj(day -> LocalDate.of(2026, 5, day))
+                .toList();
+        when(attendanceRepository.findDistinctAttendanceDatesByCohortIdAndDateBetween(
+                student.getCohortId(), PERIOD_START, PERIOD_END
+        )).thenReturn(classDates);
+        setStatuses(17, AttendanceStatus.PRESENT, 1, AttendanceStatus.ABSENT);
+
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(new BigDecimal("94.444444"), stipend.getAttendancePercentage());
+        assertEquals(new BigDecimal("90"), stipend.getPaymentPercentage());
+        assertEquals(new BigDecimal("45000.00"), stipend.getCalculatedAmount());
+    }
+
+    @Test
+    void appliesSeventyFivePercentTierAtEightyFivePercentAttendance() {
+        setStatuses(17, AttendanceStatus.PRESENT, 3, AttendanceStatus.ABSENT);
+
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(new BigDecimal("75"), stipend.getPaymentPercentage());
+        assertEquals(new BigDecimal("37500.00"), stipend.getCalculatedAmount());
+    }
+
+    @Test
+    void appliesFiftyPercentTierBelowEightyFivePercentAttendance() {
+        setStatuses(16, AttendanceStatus.PRESENT, 4, AttendanceStatus.ABSENT);
+
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(new BigDecimal("50"), stipend.getPaymentPercentage());
+        assertEquals(new BigDecimal("25000.00"), stipend.getCalculatedAmount());
+        assertEquals(new BigDecimal("4"), stipend.getAbsenceCount());
+        assertEquals(new BigDecimal("4"), stipend.getUnauthorizedAbsenceDays());
+    }
+
+    @Test
+    void excludesApprovedFullAbsencesFromAttendanceAndProRatesEligibleDays() {
+        setStatuses(15, AttendanceStatus.PRESENT, 5, AttendanceStatus.EXCUSED);
+
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(20, stipend.getScheduledTrainingDays());
+        assertEquals(15, stipend.getEligibleTrainingDays());
+        assertEquals(new BigDecimal("100.000000"), stipend.getAttendancePercentage());
+        assertEquals(new BigDecimal("100"), stipend.getPaymentPercentage());
+        assertEquals(new BigDecimal("37500.00"), stipend.getCalculatedAmount());
+        assertEquals(BigDecimal.ZERO, stipend.getUnauthorizedAbsenceDays());
+    }
+
+    @Test
+    void lateArrivalCountsAsHalfDayOfAttendanceAndUnauthorizedAbsence() {
+        setStatuses(18, AttendanceStatus.PRESENT, 1, AttendanceStatus.LATE, 1, AttendanceStatus.ABSENT);
+
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(new BigDecimal("18.5"), stipend.getCreditedAttendanceDays());
+        assertEquals(new BigDecimal("92.500000"), stipend.getAttendancePercentage());
+        assertEquals(new BigDecimal("1.5"), stipend.getUnauthorizedAbsenceDays());
+        assertEquals(new BigDecimal("1.5"), stipend.getAbsenceCount());
+        assertEquals(new BigDecimal("90"), stipend.getPaymentPercentage());
+        assertEquals(new BigDecimal("45000.00"), stipend.getCalculatedAmount());
+    }
+
+    @Test
+    void approvedHalfDayCreditsHalfAttendanceWithoutUnauthorizedAbsence() {
+        setStatuses(19, AttendanceStatus.PRESENT, 1, AttendanceStatus.APPROVED_HALF_DAY);
+
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(new BigDecimal("19.5"), stipend.getCreditedAttendanceDays());
+        assertEquals(new BigDecimal("97.500000"), stipend.getAttendancePercentage());
+        assertEquals(BigDecimal.ZERO, stipend.getUnauthorizedAbsenceDays());
+        assertEquals(new BigDecimal("100"), stipend.getPaymentPercentage());
+    }
+
+    @Test
+    void missingParticipantAttendanceIsAnUnauthorizedFullDayAbsence() {
+        setStatuses(19, AttendanceStatus.PRESENT);
+
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(new BigDecimal("1"), stipend.getAbsenceCount());
+        assertEquals(new BigDecimal("1"), stipend.getUnauthorizedAbsenceDays());
+        assertEquals(new BigDecimal("95.000000"), stipend.getAttendancePercentage());
+    }
+
+    @Test
+    void considersScheduledDaysBeforeFirstPresentRecord() {
+        List<AttendanceRecord> records = recordsFor(List.of(AttendanceStatus.ABSENT), 1);
+        records.addAll(recordsFor(List.of(AttendanceStatus.PRESENT), 19, 2));
+        when(attendanceRepository.findByStudentIdAndCohortIdAndDateBetween(
+                student.getStudentId(), student.getCohortId(), PERIOD_START, PERIOD_END
+        )).thenReturn(records);
+
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(new BigDecimal("1"), stipend.getAbsenceCount());
+        assertEquals(new BigDecimal("95.000000"), stipend.getAttendancePercentage());
+    }
+
+    @Test
+    void startsScheduledDaysOnParticipantRegistrationDate() {
+        student.setRegistrationDate(java.time.Instant.parse("2026-05-10T22:00:00Z"));
+        List<LocalDate> enrolledClassDates = IntStream.rangeClosed(11, 20)
+                .mapToObj(day -> LocalDate.of(2026, 5, day))
+                .toList();
+        when(attendanceRepository.findDistinctAttendanceDatesByCohortIdAndDateBetween(
+                student.getCohortId(),
+                LocalDate.of(2026, 5, 11),
+                PERIOD_END
+        )).thenReturn(enrolledClassDates);
+        when(policyRepository.findEffectivePolicyForCohort(
+                student.getCohortId(), LocalDate.of(2026, 5, 11)
+        )).thenReturn(Optional.of(policy));
+        when(attendanceRepository.findByStudentIdAndCohortIdAndDateBetween(
                 student.getStudentId(),
                 student.getCohortId(),
-                AttendanceStatus.PRESENT,
-                student.getCohortStartDate(),
+                LocalDate.of(2026, 5, 11),
                 PERIOD_END
-        )).thenReturn(Optional.empty());
+        )).thenReturn(recordsFor(List.of(AttendanceStatus.PRESENT), 10, 11));
 
-        assertTrue(service.calculateMonthlyStipend(PERIOD).isEmpty());
-        verifyNoInteractions(stipendRepository, policyRepository);
+        MonthlyStipend stipend = calculateOne();
+
+        assertEquals(10, stipend.getScheduledTrainingDays());
+        assertEquals(10, stipend.getEligibleTrainingDays());
+        assertEquals(BigDecimal.ZERO, stipend.getAbsenceCount());
+        assertEquals(new BigDecimal("100.000000"), stipend.getAttendancePercentage());
     }
 
     @Test
-    void skipsStudentsWhenNoCohortAttendanceDatesExistInTheMonth() {
+    void skipsCalculationWhenCohortHasNoObservedTrainingDays() {
         when(attendanceRepository.findDistinctAttendanceDatesByCohortIdAndDateBetween(
                 student.getCohortId(), PERIOD_START, PERIOD_END
         )).thenReturn(List.of());
@@ -231,146 +274,51 @@ class MonthlyStipendServiceTest {
         verifyNoInteractions(stipendRepository, policyRepository);
     }
 
-    @ParameterizedTest
-    @CsvSource({
-            "PRESENT, false",
-            "ABSENT, true",
-            "LATE, true",
-            "EXCUSED, false"
-    })
-    void appliesAbsencePolicyForEachAttendanceStatus(
-            AttendanceStatus status,
-            boolean expectedToCount) {
-        stubAbsences(expectedToCount ? 1 : 0);
-
-        MonthlyStipend stipend = calculateOne();
-
-        assertEquals(expectedToCount ? 1 : 0, stipend.getAbsenceCount());
-        assertEquals(expectedToCount, ABSENCE_STATUSES.contains(status));
-        verify(attendanceRepository)
-                .countDistinctAttendanceDatesByStudentIdAndCohortIdAndDateBetweenAndStatusIn(
-                        eq(student.getStudentId()),
-                        eq(student.getCohortId()),
-                        eq(PERIOD_START),
-                        eq(PERIOD_END),
-                        eq(ABSENCE_STATUSES)
-                );
-    }
-
-    @Test
-    void roundsFinalAmountToTwoPlacesUsingHalfUp() {
-        student.setStipendBaseAmount(new BigDecimal("10.01"));
-        when(attendanceRepository.findDistinctAttendanceDatesByCohortIdAndDateBetween(
-                student.getCohortId(), PERIOD_START, PERIOD_END
-        )).thenReturn(List.of(PERIOD_START, PERIOD_START.plusDays(1)));
-        stubPresentDays(1);
-        stubAbsences(0);
-
-        MonthlyStipend stipend = calculateOne();
-
-        assertEquals(new BigDecimal("5.01"), stipend.getCalculatedAmount());
-    }
-
-    @Test
-    void leavesApprovedStipendUnchangedOnRecalculation() {
-        MonthlyStipend approved = MonthlyStipend.builder()
-                .status(StipendStatus.APPROVED)
-                .calculatedAmount(new BigDecimal("123.45"))
-                .build();
-        when(stipendRepository.findByStudentIdAndStipendYearAndStipendMonth(
-                student.getStudentId(), 2026, 5
-        )).thenReturn(Optional.of(approved));
-
-        MonthlyStipend result = calculateOne();
-
-        assertSame(approved, result);
-        assertEquals(new BigDecimal("123.45"), result.getCalculatedAmount());
-    }
-
-    @Test
-    void recalculatesExistingMonthlyRecordInsteadOfCreatingAnother() {
-        AtomicReference<MonthlyStipend> persistedStipend = new AtomicReference<>();
-        when(stipendRepository.findByStudentIdAndStipendYearAndStipendMonth(
-                student.getStudentId(), 2026, 5
-        )).thenAnswer(invocation -> Optional.ofNullable(persistedStipend.get()));
-        when(stipendRepository.save(any(MonthlyStipend.class)))
-                .thenAnswer(invocation -> {
-                    MonthlyStipend stipend = invocation.getArgument(0);
-                    if (stipend.getId() == null) {
-                        stipend.setId(UUID.randomUUID());
-                    }
-                    persistedStipend.set(stipend);
-                    return stipend;
-                });
-
-        MonthlyStipend first = calculateOne();
-        MonthlyStipend second = calculateOne();
-
-        assertSame(first, second);
-        assertEquals(2026, second.getStipendYear());
-        assertEquals(5, second.getStipendMonth());
-        verify(stipendRepository, org.mockito.Mockito.times(2))
-                .findByStudentIdAndStipendYearAndStipendMonth(
-                        student.getStudentId(), 2026, 5
-                );
-    }
-
     private MonthlyStipend calculateOne() {
         return service.calculateMonthlyStipend(PERIOD).get(0);
     }
 
-    private void stubFirstPresent(LocalDate activationDate) {
-        stubFirstPresent(activationDate, student.getCohortStartDate(), PERIOD_END);
+    private void setStatuses(Object... countsAndStatuses) {
+        List<AttendanceRecord> records = new ArrayList<>();
+        int dayOffset = 0;
+        for (int index = 0; index < countsAndStatuses.length; index += 2) {
+            int count = (int) countsAndStatuses[index];
+            AttendanceStatus status = (AttendanceStatus) countsAndStatuses[index + 1];
+            records.addAll(recordsFor(List.of(status), count, dayOffset + 1));
+            dayOffset += count;
+        }
+        when(attendanceRepository.findByStudentIdAndCohortIdAndDateBetween(
+                student.getStudentId(), student.getCohortId(), PERIOD_START, PERIOD_END
+        )).thenReturn(records);
     }
 
-    private void stubFirstPresent(
-            LocalDate activationDate,
-            LocalDate startDate,
-            LocalDate endDate) {
-        when(attendanceRepository
-                .findFirstAttendanceDateByStudentIdAndCohortIdAndStatusAndDateBetween(
-                        student.getStudentId(),
-                        student.getCohortId(),
-                        AttendanceStatus.PRESENT,
-                        startDate,
-                        endDate
-                )).thenReturn(Optional.of(activationDate));
+    private List<AttendanceRecord> recordsFor(List<AttendanceStatus> statuses, int count) {
+        return recordsFor(statuses, count, 1);
     }
 
-    private void stubPresentDays(long count) {
-        stubPresentDays(count, PERIOD_START, PERIOD_END);
+    private List<AttendanceRecord> recordsFor(
+            List<AttendanceStatus> statuses,
+            int count,
+            int startDay
+    ) {
+        List<AttendanceRecord> records = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            AttendanceStatus status = statuses.get(index % statuses.size());
+            records.add(AttendanceRecord.builder()
+                    .attendanceId(UUID.randomUUID())
+                    .studentId(student.getStudentId())
+                    .cohortId(student.getCohortId())
+                    .date(LocalDate.of(2026, 5, startDay + index))
+                    .status(status)
+                    .eventVersion(1)
+                    .build());
+        }
+        return records;
     }
 
-    private void stubPresentDays(long count, LocalDate startDate, LocalDate endDate) {
-        when(attendanceRepository
-                .countDistinctAttendanceDatesByStudentIdAndCohortIdAndStatusAndDateBetween(
-                        student.getStudentId(),
-                        student.getCohortId(),
-                        AttendanceStatus.PRESENT,
-                        startDate,
-                        endDate
-                )).thenReturn(count);
-    }
-
-    private void stubAbsences(long count) {
-        stubAbsences(count, PERIOD_START, PERIOD_END);
-    }
-
-    private void stubAbsences(long count, LocalDate startDate, LocalDate endDate) {
-        when(attendanceRepository
-                .countDistinctAttendanceDatesByStudentIdAndCohortIdAndDateBetweenAndStatusIn(
-                        student.getStudentId(),
-                        student.getCohortId(),
-                        startDate,
-                        endDate,
-                        ABSENCE_STATUSES
-                )).thenReturn(count);
-    }
-
-    private static StipendTier tier(int min, Integer max, String percentage) {
+    private StipendTier tier(String minimumAttendance, String percentage) {
         return StipendTier.builder()
-                .minimumAbsences(min)
-                .maximumAbsences(max)
+                .minimumAttendancePercentage(new BigDecimal(minimumAttendance))
                 .paymentPercentage(new BigDecimal(percentage))
                 .build();
     }

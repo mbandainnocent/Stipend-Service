@@ -29,7 +29,7 @@ class StipendEntitySafetyTest {
         StipendTier tier = StipendTier.builder()
                 .id(UUID.randomUUID())
                 .policy(policy)
-                .minimumAbsences(0)
+                .minimumAttendancePercentage(BigDecimal.ZERO)
                 .paymentPercentage(new BigDecimal("100.00"))
                 .build();
         policy.setTiers(List.of(tier));
@@ -53,8 +53,7 @@ class StipendEntitySafetyTest {
                 true,
                 List.of(new StipendTierResponseDTO(
                         tierId,
-                        0,
-                        null,
+                        BigDecimal.ZERO,
                         new BigDecimal("100.00")
                 )),
                 Instant.parse("2026-01-01T00:00:00Z"),

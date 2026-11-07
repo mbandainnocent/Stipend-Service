@@ -8,21 +8,46 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class StipendPolicyTest {
 
     @Test
-    void validateAcceptsContiguousTiersCoveringAllAbsenceCounts() {
+    void validateAcceptsIgireAttendanceTiers() {
+        assertDoesNotThrow(() -> policy(
+                LocalDate.of(2026, 1, 1),
+                null,
+                tier("0", "50"),
+                tier("85", "75"),
+                tier("90", "90"),
+                tier("95", "100")
+        ).validate());
+    }
+
+    @Test
+    void getPaymentPercentageUsesAttendanceThresholds() {
         StipendPolicy policy = policy(
                 LocalDate.of(2026, 1, 1),
                 null,
-                tier(0, 2, "100"),
-                tier(3, 3, "50"),
-                tier(4, null, "0")
+                tier("0", "50"),
+                tier("85", "75"),
+                tier("90", "90"),
+                tier("95", "100")
         );
 
-        assertDoesNotThrow(policy::validate);
+        assertEquals(new BigDecimal("50"), policy.getPaymentPercentageForAttendance(
+                new BigDecimal("84.99")
+        ));
+        assertEquals(new BigDecimal("75"), policy.getPaymentPercentageForAttendance(
+                new BigDecimal("85")
+        ));
+        assertEquals(new BigDecimal("90"), policy.getPaymentPercentageForAttendance(
+                new BigDecimal("94.99")
+        ));
+        assertEquals(new BigDecimal("100"), policy.getPaymentPercentageForAttendance(
+                new BigDecimal("95")
+        ));
     }
 
     @Test
@@ -30,7 +55,7 @@ class StipendPolicyTest {
         assertThrows(IllegalArgumentException.class, () -> policy(
                 null,
                 null,
-                tier(0, null, "100")
+                tier("0", "100")
         ).validate());
     }
 
@@ -39,7 +64,7 @@ class StipendPolicyTest {
         assertThrows(IllegalArgumentException.class, () -> policy(
                 LocalDate.of(2026, 2, 1),
                 LocalDate.of(2026, 1, 31),
-                tier(0, null, "100")
+                tier("0", "100")
         ).validate());
     }
 
@@ -56,7 +81,7 @@ class StipendPolicyTest {
         StipendPolicy policy = policy(
                 LocalDate.of(2026, 1, 1),
                 null,
-                tier(0, null, "100")
+                tier("0", "100")
         );
         List<StipendTier> tiers = new ArrayList<>();
         tiers.add(null);
@@ -66,92 +91,60 @@ class StipendPolicyTest {
     }
 
     @Test
-    void validateRejectsNegativeMinimum() {
+    void validateRejectsMissingZeroThreshold() {
         assertThrows(IllegalArgumentException.class, () -> policy(
                 LocalDate.of(2026, 1, 1),
                 null,
-                tier(-1, null, "100")
+                tier("85", "75")
         ).validate());
     }
 
     @Test
-    void validateRejectsMaximumBelowMinimum() {
+    void validateRejectsDuplicateThresholds() {
         assertThrows(IllegalArgumentException.class, () -> policy(
                 LocalDate.of(2026, 1, 1),
                 null,
-                tier(2, 1, "100")
+                tier("0", "50"),
+                tier("85", "75"),
+                tier("85", "90")
         ).validate());
     }
 
     @Test
-    void validateRejectsOverlappingTiers() {
-        assertThrows(IllegalArgumentException.class, () -> policy(
-                LocalDate.of(2026, 1, 1),
-                null,
-                tier(0, 3, "100"),
-                tier(3, null, "50")
-        ).validate());
-    }
-
-    @Test
-    void validateRejectsGapsBetweenTiers() {
-        assertThrows(IllegalArgumentException.class, () -> policy(
-                LocalDate.of(2026, 1, 1),
-                null,
-                tier(0, 1, "100"),
-                tier(3, null, "50")
-        ).validate());
-    }
-
-    @Test
-    void validateRejectsTiersThatDoNotStartAtZero() {
-        assertThrows(IllegalArgumentException.class, () -> policy(
-                LocalDate.of(2026, 1, 1),
-                null,
-                tier(1, null, "100")
-        ).validate());
-    }
-
-    @Test
-    void validateRejectsAnUnboundedTierBeforeTheFinalTier() {
-        assertThrows(IllegalArgumentException.class, () -> policy(
-                LocalDate.of(2026, 1, 1),
-                null,
-                tier(0, null, "100"),
-                tier(1, null, "50")
-        ).validate());
-    }
-
-    @Test
-    void validateRejectsFiniteFinalTier() {
-        assertThrows(IllegalArgumentException.class, () -> policy(
-                LocalDate.of(2026, 1, 1),
-                null,
-                tier(0, 5, "100")
-        ).validate());
-    }
-
-    @Test
-    void validateRejectsPercentagesOutsideZeroToOneHundred() {
+    void validateRejectsInvalidAttendanceThresholdsAndPaymentPercentages() {
+        for (String value : List.of("-0.01", "100.01")) {
+            assertThrows(IllegalArgumentException.class, () -> policy(
+                    LocalDate.of(2026, 1, 1),
+                    null,
+                    tier("0", "100"),
+                    tier(value, "50")
+            ).validate());
+        }
         for (String percentage : List.of("-0.01", "100.01")) {
             assertThrows(IllegalArgumentException.class, () -> policy(
                     LocalDate.of(2026, 1, 1),
                     null,
-                    tier(0, null, percentage)
+                    tier("0", percentage)
             ).validate());
         }
     }
 
     @Test
-    void validateRejectsMissingPaymentPercentage() {
-        StipendTier tier = tier(0, null, "100");
-        tier.setPaymentPercentage(null);
-
-        assertThrows(IllegalArgumentException.class, () -> policy(
+    void getPaymentPercentageRejectsInvalidAttendancePercentages() {
+        StipendPolicy policy = policy(
                 LocalDate.of(2026, 1, 1),
                 null,
-                tier
-        ).validate());
+                tier("0", "50")
+        );
+        for (BigDecimal percentage : List.of(
+                new BigDecimal("-0.01"),
+                new BigDecimal("100.01")
+        )) {
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> policy.getPaymentPercentageForAttendance(percentage)
+            );
+        }
     }
 
     private StipendPolicy policy(
@@ -166,10 +159,9 @@ class StipendPolicyTest {
                 .build();
     }
 
-    private StipendTier tier(int minimum, Integer maximum, String percentage) {
+    private StipendTier tier(String minimumAttendance, String percentage) {
         return StipendTier.builder()
-                .minimumAbsences(minimum)
-                .maximumAbsences(maximum)
+                .minimumAttendancePercentage(new BigDecimal(minimumAttendance))
                 .paymentPercentage(new BigDecimal(percentage))
                 .build();
     }

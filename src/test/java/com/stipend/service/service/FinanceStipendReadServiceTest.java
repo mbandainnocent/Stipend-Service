@@ -81,7 +81,7 @@ class FinanceStipendReadServiceTest {
                 .policyId(UUID.randomUUID())
                 .stipendYear(2024)
                 .stipendMonth(2)
-                .absenceCount(1)
+                .absenceCount(new BigDecimal("1.5"))
                 .baseAmount(new BigDecimal("40000.00"))
                 .paymentPercentage(new BigDecimal("75.00"))
                 .calculatedAmount(new BigDecimal("25000.00"))
@@ -193,7 +193,12 @@ class FinanceStipendReadServiceTest {
                 UUID.randomUUID(),
                 year,
                 month,
-                1,
+                new BigDecimal("1.5"),
+                20,
+                19,
+                new BigDecimal("18.5"),
+                new BigDecimal("97.368421"),
+                new BigDecimal("0.5"),
                 new BigDecimal("40000.00"),
                 new BigDecimal("75.00"),
                 new BigDecimal("25000.00"),
@@ -224,6 +229,11 @@ class FinanceStipendReadServiceTest {
                 LocalDate.of(view.stipendYear(), view.stipendMonth(), 1),
                 LocalDate.of(view.stipendYear(), view.stipendMonth(), 29),
                 view.absenceCount(),
+                view.scheduledTrainingDays(),
+                view.eligibleTrainingDays(),
+                view.creditedAttendanceDays(),
+                view.attendancePercentage(),
+                view.unauthorizedAbsenceDays(),
                 view.baseAmount(),
                 view.paymentPercentage(),
                 view.calculatedAmount(),

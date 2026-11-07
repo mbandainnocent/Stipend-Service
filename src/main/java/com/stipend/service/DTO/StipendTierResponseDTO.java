@@ -5,8 +5,7 @@ import java.util.UUID;
 
 public record StipendTierResponseDTO(
         UUID id,
-        int minimumAbsences,
-        Integer maximumAbsences,
+        BigDecimal minimumAttendancePercentage,
         BigDecimal paymentPercentage
 ) {
 }

@@ -102,6 +102,7 @@ class FinanceRepositoryIntegrationTest {
         assertThat(view.cohortId()).isEqualTo(cohortId);
         assertThat(view.cohortStartDate()).isEqualTo(LocalDate.of(2026, 1, 15));
         assertThat(view.cohortEndDate()).isEqualTo(LocalDate.of(2026, 12, 31));
+        assertThat(view.scheduledTrainingDays()).isNull();
         assertThat(view.calculatedAmount()).isEqualByComparingTo("20000.00");
         assertThat(view.currency()).isEqualTo("RWF");
         assertThat(view.stipendPeriodStartDate()).isEqualTo(LocalDate.of(2026, 8, 1));
@@ -128,10 +129,15 @@ class FinanceRepositoryIntegrationTest {
         assertThat(policy.isEnabled()).isTrue();
         assertThat(policy.getProgramId()).isEqualTo(programId);
         assertThat(policy.getCohortId()).isEqualTo(cohortId);
-        assertThat(policy.getTiers()).hasSize(2);
+        assertThat(policy.getTiers()).hasSize(4);
         assertThat(policy.getTiers())
                 .extracting(StipendTier::getPaymentPercentage)
-                .containsExactly(new BigDecimal("100.00"), new BigDecimal("50.00"));
+                .containsExactly(
+                        new BigDecimal("50.00"),
+                        new BigDecimal("75.00"),
+                        new BigDecimal("90.00"),
+                        new BigDecimal("100.00")
+                );
     }
 
     private UUID saveStudent(String firstName, String lastName, UUID cohortId) {
@@ -168,7 +174,7 @@ class FinanceRepositoryIntegrationTest {
                 .policyId(UUID.randomUUID())
                 .stipendYear(year)
                 .stipendMonth(month)
-                .absenceCount(0)
+                .absenceCount(BigDecimal.ZERO)
                 .baseAmount(new BigDecimal("40000.00"))
                 .paymentPercentage(new BigDecimal("100.00"))
                 .calculatedAmount(new BigDecimal("20000.00"))
@@ -186,8 +192,10 @@ class FinanceRepositoryIntegrationTest {
                 .enabled(enabled)
                 .effectiveFrom(LocalDate.of(2026, 1, 1))
                 .tiers(List.of(
-                        tier(0, 2, "100.00"),
-                        tier(3, null, "50.00")
+                        tier("0", "50.00"),
+                        tier("85", "75.00"),
+                        tier("90", "90.00"),
+                        tier("95", "100.00")
                 ))
                 .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
                 .updatedAt(Instant.parse("2026-01-01T00:00:00Z"))
@@ -196,10 +204,9 @@ class FinanceRepositoryIntegrationTest {
         stipendPolicyRepository.saveAndFlush(policy);
     }
 
-    private StipendTier tier(int minimum, Integer maximum, String percentage) {
+    private StipendTier tier(String minimumAttendance, String percentage) {
         return StipendTier.builder()
-                .minimumAbsences(minimum)
-                .maximumAbsences(maximum)
+                .minimumAttendancePercentage(new BigDecimal(minimumAttendance))
                 .paymentPercentage(new BigDecimal(percentage))
                 .build();
     }

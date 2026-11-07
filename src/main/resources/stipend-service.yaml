@@ -514,6 +514,7 @@ components:
         - ABSENT
         - LATE
         - EXCUSED
+        - APPROVED_HALF_DAY
 
     MonthlyStipendResponse:
       type: object
@@ -578,9 +579,41 @@ components:
           format: date
           description: Last calendar day of the stipend month.
         absenceCount:
-          type: integer
+          type: number
+          format: decimal
           minimum: 0
-          example: 3
+          description: Total unauthorized absence days, including half-day losses; matches unauthorizedAbsenceDays.
+          example: 1.5
+        scheduledTrainingDays:
+          type: integer
+          nullable: true
+          description: Observed cohort class dates in the stipend period.
+          example: 20
+        eligibleTrainingDays:
+          type: integer
+          nullable: true
+          description: Scheduled days excluding approved full-day absences.
+          example: 19
+        creditedAttendanceDays:
+          type: number
+          format: decimal
+          nullable: true
+          description: Attendance credits, including half-day credits.
+          example: 18.5
+        attendancePercentage:
+          type: number
+          format: decimal
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Credited attendance days divided by eligible training days.
+          example: 97.368421
+        unauthorizedAbsenceDays:
+          type: number
+          format: decimal
+          nullable: true
+          description: Unauthorized full- and half-day absence total.
+          example: 0.5
         baseAmount:
           type: number
           format: decimal
@@ -715,19 +748,16 @@ components:
 
     StipendTierResponse:
       type: object
-      required: [id, minimumAbsences, paymentPercentage]
+      required: [id, minimumAttendancePercentage, paymentPercentage]
       properties:
         id:
           type: string
           format: uuid
-        minimumAbsences:
-          type: integer
+        minimumAttendancePercentage:
+          type: number
+          format: decimal
           minimum: 0
-        maximumAbsences:
-          type: integer
-          minimum: 0
-          nullable: true
-          description: Null means there is no upper absence limit.
+          maximum: 100
         paymentPercentage:
           type: number
           format: decimal

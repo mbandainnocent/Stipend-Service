@@ -18,7 +18,7 @@ import java.util.UUID;
 @Builder
 @Getter
 @Setter
-@Schema(description = "Represents a payment tier within a stipend policy based on absence thresholds")
+@Schema(description = "Represents a payment tier within a stipend policy based on attendance percentage")
 public class StipendTier {
     @Id
     @GeneratedValue
@@ -30,13 +30,9 @@ public class StipendTier {
     @Schema(hidden = true)
     private StipendPolicy policy;
 
-    @Column(name = "minimum_absences", nullable = false)
-    @Schema(description = "Minimum number of absences to qualify for this tier")
-    private int minimumAbsences;
-
-    @Column(name = "maximum_absences")
-    @Schema(description = "Maximum number of absences for this tier (null if no upper limit)")
-    private Integer maximumAbsences;
+    @Column(name = "minimum_attendance_percentage", nullable = false, precision = 5, scale = 2)
+    @Schema(description = "Minimum attendance percentage to qualify for this tier")
+    private BigDecimal minimumAttendancePercentage;
 
     @Column(name = "payment_percentage", nullable = false, precision = 5, scale = 2)
     @Schema(description = "Payment percentage to apply for this tier")

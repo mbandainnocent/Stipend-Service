@@ -51,10 +51,10 @@ class StipendPolicyReadServiceTest {
         assertEquals(cohortId, response.cohortId());
         assertEquals(LocalDate.of(2025, 1, 1), response.effectiveFrom());
         assertEquals(true, response.enabled());
-        assertEquals(List.of(0, 3), response.tiers().stream()
-                .map(tier -> tier.minimumAbsences())
+        assertEquals(List.of(new BigDecimal("0.00"), new BigDecimal("90.00")), response.tiers().stream()
+                .map(tier -> tier.minimumAttendancePercentage())
                 .toList());
-        assertEquals(new BigDecimal("50.00"), response.tiers().get(1).paymentPercentage());
+        assertEquals(new BigDecimal("90.00"), response.tiers().get(1).paymentPercentage());
     }
 
     @Test
@@ -90,19 +90,18 @@ class StipendPolicyReadServiceTest {
                 .createdAt(Instant.parse("2025-01-01T00:00:00Z"))
                 .updatedAt(Instant.parse("2025-01-01T00:00:00Z"))
                 .tiers(List.of(
-                        tier(3, null, "50.00"),
-                        tier(0, 2, "100.00")
+                        tier("90.00", "90.00"),
+                        tier("0.00", "50.00")
                 ))
                 .build();
         policy.getTiers().forEach(tier -> tier.setPolicy(policy));
         return policy;
     }
 
-    private StipendTier tier(int minimumAbsences, Integer maximumAbsences, String percentage) {
+    private StipendTier tier(String minimumAttendance, String percentage) {
         return StipendTier.builder()
                 .id(UUID.randomUUID())
-                .minimumAbsences(minimumAbsences)
-                .maximumAbsences(maximumAbsences)
+                .minimumAttendancePercentage(new BigDecimal(minimumAttendance))
                 .paymentPercentage(new BigDecimal(percentage))
                 .build();
     }

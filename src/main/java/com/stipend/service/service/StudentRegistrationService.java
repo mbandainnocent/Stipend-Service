@@ -83,10 +83,10 @@ public class StudentRegistrationService {
                 .enabled(true)
                 .effectiveFrom(effectiveFrom)
                 .tiers(List.of(
-                        createTier(0, 2, "100.00"),
-                        createTier(3, 3, "50.00"),
-                        createTier(4, null, "0.00")
-
+                        createTier("0.00", "50.00"),
+                        createTier("85.00", "75.00"),
+                        createTier("90.00", "90.00"),
+                        createTier("95.00", "100.00")
                 ))
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -97,13 +97,11 @@ public class StudentRegistrationService {
     }
 
     private StipendTier createTier(
-            int minimumAbsences,
-            Integer maximumAbsences,
+            String minimumAttendancePercentage,
             String paymentPercentage
     ) {
         return StipendTier.builder()
-                .minimumAbsences(minimumAbsences)
-                .maximumAbsences(maximumAbsences)
+                .minimumAttendancePercentage(new BigDecimal(minimumAttendancePercentage))
                 .paymentPercentage(new BigDecimal(paymentPercentage))
                 .build();
     }

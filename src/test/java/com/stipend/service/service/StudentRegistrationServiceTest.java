@@ -83,19 +83,23 @@ class StudentRegistrationServiceTest {
         assertEquals(cohortId, savedPolicy.getCohortId());
         assertEquals(programId, savedPolicy.getProgramId());
         assertEquals(LocalDate.of(2026, 1, 2), savedPolicy.getEffectiveFrom());
-        assertEquals(3, savedPolicy.getTiers().size());
-        assertEquals(0, savedPolicy.getTiers().get(0).getMinimumAbsences());
-        assertEquals(2, savedPolicy.getTiers().get(0).getMaximumAbsences());
-        assertEquals(new BigDecimal("100.00"),
-                savedPolicy.getTiers().get(0).getPaymentPercentage());
-        assertEquals(3, savedPolicy.getTiers().get(1).getMinimumAbsences());
-        assertEquals(3, savedPolicy.getTiers().get(1).getMaximumAbsences());
-        assertEquals(new BigDecimal("50.00"),
-                savedPolicy.getTiers().get(1).getPaymentPercentage());
-        assertEquals(4, savedPolicy.getTiers().get(2).getMinimumAbsences());
-        assertNull(savedPolicy.getTiers().get(2).getMaximumAbsences());
+        assertEquals(4, savedPolicy.getTiers().size());
         assertEquals(new BigDecimal("0.00"),
+                savedPolicy.getTiers().get(0).getMinimumAttendancePercentage());
+        assertEquals(new BigDecimal("50.00"),
+                savedPolicy.getTiers().get(0).getPaymentPercentage());
+        assertEquals(new BigDecimal("85.00"),
+                savedPolicy.getTiers().get(1).getMinimumAttendancePercentage());
+        assertEquals(new BigDecimal("75.00"),
+                savedPolicy.getTiers().get(1).getPaymentPercentage());
+        assertEquals(new BigDecimal("90.00"),
+                savedPolicy.getTiers().get(2).getMinimumAttendancePercentage());
+        assertEquals(new BigDecimal("90.00"),
                 savedPolicy.getTiers().get(2).getPaymentPercentage());
+        assertEquals(new BigDecimal("95.00"),
+                savedPolicy.getTiers().get(3).getMinimumAttendancePercentage());
+        assertEquals(new BigDecimal("100.00"),
+                savedPolicy.getTiers().get(3).getPaymentPercentage());
         assertTrue(savedPolicy.getTiers().stream()
                 .allMatch(tier -> tier.getPolicy() == savedPolicy));
         Student savedStudent = studentCaptor.getValue();

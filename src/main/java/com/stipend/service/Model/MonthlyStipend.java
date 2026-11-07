@@ -46,12 +46,24 @@ public class MonthlyStipend {
     @Schema(description = "Month of the stipend period (1-12)")
     private int stipendMonth;
 
-    @Schema(description = "Number of absences recorded for the month")
-    private int absenceCount;
+    @Schema(description = "Total unauthorized absence days, including half-day losses")
+    @Column(precision = 6, scale = 2)
+    private BigDecimal absenceCount;
+
+    @Schema(description = "Number of cohort training days scheduled in the period")
+    private Integer scheduledTrainingDays;
+    @Schema(description = "Scheduled training days excluding approved full-day absences")
+    private Integer eligibleTrainingDays;
+    @Schema(description = "Attendance credited in training days, including half days")
+    private BigDecimal creditedAttendanceDays;
+    @Schema(description = "Attendance percentage used to select the payment tier")
+    private BigDecimal attendancePercentage;
+    @Schema(description = "Unauthorized full and half absence days in the period")
+    private BigDecimal unauthorizedAbsenceDays;
 
     @Schema(description = "Base amount from the stipend policy")
     private BigDecimal baseAmount;
-    @Schema(description = "Payment percentage applied based on absence count")
+    @Schema(description = "Payment percentage applied based on monthly attendance")
     private BigDecimal paymentPercentage;
     @Schema(description = "Final calculated amount to be paid")
     private BigDecimal calculatedAmount;

@@ -35,6 +35,13 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
             @Param("endDate") LocalDate endDate
     );
 
+    List<AttendanceRecord> findByStudentIdAndCohortIdAndDateBetween(
+            UUID studentId,
+            UUID cohortId,
+            LocalDate startDate,
+            LocalDate endDate
+    );
+
     @Query("""
             select min(attendance.date)
             from AttendanceRecord attendance

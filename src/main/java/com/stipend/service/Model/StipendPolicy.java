@@ -51,7 +51,7 @@ public class StipendPolicy {
             orphanRemoval = true
     )
     @Builder.Default
-    @Schema(description = "List of payment tiers based on absence thresholds")
+    @Schema(description = "List of payment tiers based on monthly attendance percentage")
     private List<StipendTier> tiers = new ArrayList<>();
 
     @Schema(description = "Timestamp when the policy was created")
@@ -60,21 +60,25 @@ public class StipendPolicy {
     @Schema(description = "Timestamp when the policy was last updated")
     private Instant updatedAt;
 
-    public BigDecimal getPaymentPercentageForAbsences(int absenceCount) {
-        if (absenceCount < 0) {
-            throw new IllegalArgumentException("Absence count cannot be negative");
+    public BigDecimal getPaymentPercentageForAttendance(BigDecimal attendancePercentage) {
+        if (attendancePercentage == null
+                || attendancePercentage.compareTo(BigDecimal.ZERO) < 0
+                || attendancePercentage.compareTo(new BigDecimal("100")) > 0) {
+            throw new IllegalArgumentException(
+                    "Attendance percentage must be between 0 and 100"
+            );
         }
 
         List<StipendTier> matchingTiers = tiers.stream()
-                .filter(tier -> absenceCount >= tier.getMinimumAbsences())
-                .filter(tier -> tier.getMaximumAbsences() == null
-                        || absenceCount <= tier.getMaximumAbsences())
+                .filter(tier -> attendancePercentage.compareTo(
+                        tier.getMinimumAttendancePercentage()) >= 0)
+                .sorted(Comparator.comparing(StipendTier::getMinimumAttendancePercentage).reversed())
                 .toList();
 
-        if (matchingTiers.size() != 1) {
+        if (matchingTiers.isEmpty()) {
             throw new IllegalStateException(
-                    "Expected exactly one stipend tier for " + absenceCount
-                            + " absences in policy " + policyId
+                    "No stipend tier for " + attendancePercentage
+                            + "% attendance in policy " + policyId
             );
         }
 
@@ -82,8 +86,8 @@ public class StipendPolicy {
         if (percentage == null || percentage.compareTo(BigDecimal.ZERO) < 0
                 || percentage.compareTo(new BigDecimal("100")) > 0) {
             throw new IllegalStateException(
-                    "Invalid payment percentage for " + absenceCount
-                            + " absences in policy " + policyId
+                    "Invalid payment percentage for " + attendancePercentage
+                            + "% attendance in policy " + policyId
             );
         }
         return percentage;
@@ -104,20 +108,28 @@ public class StipendPolicy {
         if (tiers.stream().anyMatch(tier -> tier == null)) {
             throw new IllegalArgumentException("Policy tiers cannot contain null entries");
         }
+        if (tiers.stream().anyMatch(tier -> tier.getMinimumAttendancePercentage() == null)) {
+            throw new IllegalArgumentException(
+                    "Tier minimumAttendancePercentage is required"
+            );
+        }
 
         List<StipendTier> orderedTiers = tiers.stream()
-                .sorted(Comparator.comparingInt(StipendTier::getMinimumAbsences))
+                .sorted(Comparator.comparing(StipendTier::getMinimumAttendancePercentage))
                 .toList();
-        long expectedMinimum = 0;
+        BigDecimal previousMinimum = null;
         for (int index = 0; index < orderedTiers.size(); index++) {
             StipendTier tier = orderedTiers.get(index);
-            if (tier.getMinimumAbsences() < 0) {
-                throw new IllegalArgumentException("Tier minimumAbsences cannot be negative");
-            }
-            if (tier.getMaximumAbsences() != null
-                    && tier.getMaximumAbsences() < tier.getMinimumAbsences()) {
+            BigDecimal minimum = tier.getMinimumAttendancePercentage();
+            if (minimum == null || minimum.compareTo(BigDecimal.ZERO) < 0
+                    || minimum.compareTo(new BigDecimal("100")) > 0) {
                 throw new IllegalArgumentException(
-                        "Tier maximumAbsences cannot be below minimumAbsences"
+                        "Tier minimumAttendancePercentage must be between 0 and 100"
+                );
+            }
+            if (previousMinimum != null && minimum.compareTo(previousMinimum) <= 0) {
+                throw new IllegalArgumentException(
+                        "Stipend tier attendance thresholds must be unique and increasing"
                 );
             }
             BigDecimal percentage = tier.getPaymentPercentage();
@@ -127,24 +139,12 @@ public class StipendPolicy {
                         "Tier paymentPercentage must be between 0 and 100"
                 );
             }
-            if (tier.getMinimumAbsences() != expectedMinimum) {
-                throw new IllegalArgumentException(
-                        "Stipend tiers must be contiguous and non-overlapping from zero absences"
-                );
-            }
-            if (tier.getMaximumAbsences() == null) {
-                if (index != orderedTiers.size() - 1) {
-                    throw new IllegalArgumentException(
-                            "An unbounded tier must be the final stipend tier"
-                    );
-                }
-            } else {
-                expectedMinimum = tier.getMaximumAbsences() + 1;
-            }
+            previousMinimum = minimum;
         }
-        if (orderedTiers.get(orderedTiers.size() - 1).getMaximumAbsences() != null) {
+        if (orderedTiers.get(0).getMinimumAttendancePercentage()
+                .compareTo(BigDecimal.ZERO) != 0) {
             throw new IllegalArgumentException(
-                    "Final stipend tier must cover all remaining absence counts"
+                    "Stipend tiers must include a zero-percent attendance threshold"
             );
         }
     }
