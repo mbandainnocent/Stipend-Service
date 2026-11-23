@@ -1,0 +1,2 @@
+ALTER TABLE stipend_attendance
+    ADD COLUMN IF NOT EXISTS event_version INTEGER NOT NULL DEFAULT 0;

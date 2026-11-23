@@ -1,0 +1,62 @@
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.kafka.consumer.properties.spring.json.trusted.packages: com.stipend.service.Event
+        spring.kafka.consumer.properties.spring.json.use.type.headers: false
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+      properties:
+        spring.json.add.type.headers: false
+
+    listener:
+      ack-mode: record
+
+app:
+  kafka:
+    topics:
+      registration: registration-events
+      student-status: student-status-events
+      attendance: attendance-events
+
+    consumer-groups:
+      registration: stipend-service-registration-group
+      attendance: stipend-service-attendance-group
+      student-status: stipend-service-student-status-group
+
+    retry:
+      interval-ms: 1000
+      max-retries: 2
+
+  registration:
+    business-time-zone: Africa/Kigali
+
+  stipend:
+    calculation:
+      cron: "0 0 2 * * *"
+  jwt:
+    secret: ${APP_JWT_SECRET}
+    access-token-expiration-ms: ${APP_JWT_ACCESS_TOKEN_EXPIRATION_MS:900000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never

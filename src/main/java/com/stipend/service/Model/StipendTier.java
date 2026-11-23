@@ -1,0 +1,40 @@
+package com.stipend.service.Model;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Entity
+@Table(name = "stipend_tiers")
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Getter
+@Setter
+@Schema(description = "Represents a payment tier within a stipend policy based on attendance percentage")
+public class StipendTier {
+    @Id
+    @GeneratedValue
+    @Schema(description = "Unique identifier for the stipend tier")
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "policy_id", nullable = false)
+    @Schema(hidden = true)
+    private StipendPolicy policy;
+
+    @Column(name = "minimum_attendance_percentage", nullable = false, precision = 5, scale = 2)
+    @Schema(description = "Minimum attendance percentage to qualify for this tier")
+    private BigDecimal minimumAttendancePercentage;
+
+    @Column(name = "payment_percentage", nullable = false, precision = 5, scale = 2)
+    @Schema(description = "Payment percentage to apply for this tier")
+    private BigDecimal paymentPercentage;
+}

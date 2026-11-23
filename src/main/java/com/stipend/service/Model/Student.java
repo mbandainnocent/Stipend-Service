@@ -1,0 +1,95 @@
+package com.stipend.service.Model;
+
+import com.stipend.service.Enum.StudentStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Entity
+@Table(name = "stipend_students")
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Data
+@Schema(description = "Represents a student enrolled in a stipend program")
+public class Student {
+
+    @Id
+    @Schema(description = "Unique identifier for the student")
+    @Column(name = "student_id", nullable = false)
+    private UUID studentId;
+
+    @Schema(description = "First name of the student")
+    @Column(name = "first_name", nullable = false)
+    private String firstName;
+
+    @Schema(description = "Last name of the student")
+    @Column(name = "last_name", nullable = false)
+    private String lastName;
+
+    @Schema(description = "ID of the program the student is enrolled in")
+    @Column(name = "program_id", nullable = false)
+    private UUID programId;
+
+    @Schema(description = "ID of the cohort the student belongs to")
+    @Column(name = "cohort_id", nullable = false)
+    private UUID cohortId;
+
+    @Schema(description = "Start date of the student's cohort")
+    @Column(name = "cohort_start_date", nullable = false)
+    private LocalDate cohortStartDate;
+
+    @Schema(description = "End date of the student's cohort")
+    @Column(name = "cohort_end_date", nullable = false)
+    private LocalDate cohortEndDate;
+
+    @Enumerated(EnumType.STRING)
+    @Schema(description = "Current enrollment status of the student")
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private StudentStatus status = StudentStatus.ACTIVE;
+
+    @Schema(description = "Timestamp when the student was registered")
+    @Column(name = "registered_at", nullable = false)
+    private Instant registeredAt;
+
+    @Schema(description = "Timestamp when the student record was last updated")
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Schema(description = "Registration date of the student")
+    @Column(name = "registration_date")
+    private Instant registrationDate;
+
+    @Schema(description = "Version of the student record")
+    @Column(name = "version")
+    private int version;
+
+    @Schema(description = "Whether the student's cohort qualifies under its policy at cohort start")
+    @Column(name = "stipend_eligible", nullable = false, columnDefinition = "boolean default false")
+    private boolean stipendEligible;
+
+    @Schema(description = "Whether the cohort is configured for stipends by Student Registration Service")
+    @Column(name = "cohort_stipend_eligible", nullable = false, columnDefinition = "boolean default false")
+    private boolean cohortStipendEligible;
+
+    @Schema(description = "Monthly base amount supplied by Student Registration Service")
+    @Column(name = "stipend_base_amount", precision = 12, scale = 2)
+    private BigDecimal stipendBaseAmount;
+
+    @Schema(description = "Currency code supplied by Student Registration Service")
+    @Column(name = "stipend_currency", length = 3)
+    private String stipendCurrency;
+
+    @Schema(description = "Version of the latest student status event")
+    @Column(name = "status_version", nullable = false, columnDefinition = "integer default 0")
+    private int statusVersion;
+}
