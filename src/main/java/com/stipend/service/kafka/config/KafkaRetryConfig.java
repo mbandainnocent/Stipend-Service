@@ -1,6 +1,7 @@
 package com.stipend.service.kafka.config;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -15,14 +16,21 @@ import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.kafka.support.SendResult;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Configuration
 public class KafkaRetryConfig {
+    private static final Logger dltLogger = LoggerFactory.getLogger(KafkaRetryConfig.class);
+    private static final String DLT_PUBLISH_METRIC = "stipend.kafka.dlt.publish";
 
     @Bean
     public ProducerFactory<Object, Object> producerFactory(
@@ -61,10 +69,41 @@ public class KafkaRetryConfig {
     @Bean
     public DefaultErrorHandler kafkaErrorHandler(
             KafkaTemplate<Object, Object> kafkaTemplate,
+            MeterRegistry meterRegistry,
             @Value("${app.kafka.retry.interval-ms:1000}") long retryIntervalMs,
             @Value("${app.kafka.retry.max-retries:2}") long maxRetries) {
         DeadLetterPublishingRecoverer recoverer =
-                new DeadLetterPublishingRecoverer(kafkaTemplate);
+                new DeadLetterPublishingRecoverer(kafkaTemplate) {
+                    @Override
+                    protected void verifySendResult(
+                            org.springframework.kafka.core.KafkaOperations<Object, Object> template,
+                            org.apache.kafka.clients.producer.ProducerRecord<Object, Object> producerRecord,
+                            CompletableFuture<SendResult<Object, Object>> result,
+                            ConsumerRecord<?, ?> consumerRecord) {
+                        try {
+                            super.verifySendResult(template, producerRecord, result, consumerRecord);
+                            meterRegistry.counter(
+                                    DLT_PUBLISH_METRIC,
+                                    "source_topic", consumerRecord.topic(),
+                                    "outcome", "success"
+                            ).increment();
+                        } catch (RuntimeException exception) {
+                            meterRegistry.counter(
+                                    DLT_PUBLISH_METRIC,
+                                    "source_topic", consumerRecord.topic(),
+                                    "outcome", "failure"
+                            ).increment();
+                            dltLogger.error(
+                                    "Failed to publish record to DLT for source topic {} partition {} offset {}",
+                                    consumerRecord.topic(),
+                                    consumerRecord.partition(),
+                                    consumerRecord.offset(),
+                                    exception
+                            );
+                            throw exception;
+                        }
+                    }
+                };
         recoverer.setFailIfSendResultIsError(true);
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(

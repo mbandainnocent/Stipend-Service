@@ -1,4 +1,9 @@
 package com.stipend.service.DTO;
 
-public record ApproveStipendRequestDTO(String comment) {
+import jakarta.validation.constraints.Size;
+
+public record ApproveStipendRequestDTO(
+        @Size(max = 500, message = "comment must not exceed 500 characters")
+        String comment
+) {
 }

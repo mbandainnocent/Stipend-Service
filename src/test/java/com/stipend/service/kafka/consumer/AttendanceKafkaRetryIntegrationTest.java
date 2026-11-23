@@ -26,6 +26,7 @@ import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.ContainerTestUtils;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
@@ -73,6 +74,7 @@ class AttendanceKafkaRetryIntegrationTest {
     private KafkaTemplate<Object, Object> dltTemplate;
     private DefaultKafkaProducerFactory<String, String> sourceProducerFactory;
     private DefaultKafkaProducerFactory<Object, Object> dltProducerFactory;
+    private SimpleMeterRegistry meterRegistry;
     private ConcurrentMessageListenerContainer<String, AttendanceEvent> container;
     private Consumer<String, byte[]> dltConsumer;
 
@@ -86,6 +88,7 @@ class AttendanceKafkaRetryIntegrationTest {
                 StringSerializer.class
         );
         sourceProducerFactory = new DefaultKafkaProducerFactory<>(producerProperties);
+        meterRegistry = new SimpleMeterRegistry();
         sourceTemplate = new KafkaTemplate<>(sourceProducerFactory);
 
         KafkaProperties kafkaProperties = new KafkaProperties();
@@ -106,6 +109,7 @@ class AttendanceKafkaRetryIntegrationTest {
         }
         sourceProducerFactory.destroy();
         dltProducerFactory.destroy();
+        meterRegistry.close();
     }
 
     @Test
@@ -146,6 +150,11 @@ class AttendanceKafkaRetryIntegrationTest {
                         Duration.ofSeconds(10));
 
         assertThat(deadLetter.value()).isEqualTo(malformedJson);
+        assertThat(meterRegistry.get("stipend.kafka.dlt.publish")
+                .tag("source_topic", "attendance-malformed-test")
+                .tag("outcome", "success")
+                .counter()
+                .count()).isEqualTo(1);
         assertThat(serviceCalls.get()).isZero();
     }
 
@@ -173,6 +182,11 @@ class AttendanceKafkaRetryIntegrationTest {
 
         assertThat(new ObjectMapper().readTree(deadLetter.value()).get("attendanceId").isNull())
                 .isTrue();
+        assertThat(meterRegistry.get("stipend.kafka.dlt.publish")
+                .tag("source_topic", "attendance-invalid-test")
+                .tag("outcome", "success")
+                .counter()
+                .count()).isEqualTo(1);
         assertThat(attempts.get()).isEqualTo(1);
     }
 
@@ -200,6 +214,7 @@ class AttendanceKafkaRetryIntegrationTest {
         factory.setConsumerFactory(consumerFactory);
         factory.setCommonErrorHandler(new KafkaRetryConfig().kafkaErrorHandler(
                 dltTemplate,
+                meterRegistry,
                 0,
                 2
         ));

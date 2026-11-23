@@ -48,3 +48,15 @@ app:
   stipend:
     calculation:
       cron: "0 0 2 * * *"
+  jwt:
+    secret: ${APP_JWT_SECRET}
+    access-token-expiration-ms: ${APP_JWT_ACCESS_TOKEN_EXPIRATION_MS:900000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never

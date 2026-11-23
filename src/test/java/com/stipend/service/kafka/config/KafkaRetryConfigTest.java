@@ -13,6 +13,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -29,6 +31,7 @@ class KafkaRetryConfigTest {
             new ApplicationContextRunner()
                     .withConfiguration(
                             AutoConfigurations.of(KafkaAutoConfiguration.class))
+                    .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
                     .withUserConfiguration(KafkaRetryConfig.class);
 
     @Test
@@ -64,8 +67,10 @@ class KafkaRetryConfigTest {
                         );
         when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(failedSend);
 
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         var errorHandler = new KafkaRetryConfig().kafkaErrorHandler(
                 kafkaTemplate,
+                meterRegistry,
                 0,
                 0
         );
@@ -88,6 +93,74 @@ class KafkaRetryConfigTest {
         );
 
         assertThat(handled).isFalse();
+        assertThat(meterRegistry.get("stipend.kafka.dlt.publish")
+                .tag("source_topic", "attendance-events")
+                .tag("outcome", "failure")
+                .counter()
+                .count()).isEqualTo(1);
         verify(kafkaTemplate).send(any(ProducerRecord.class));
+        meterRegistry.close();
+    }
+
+    @Test
+    void recordsRecoveryAfterDeadLetterSendStartsSucceeding() {
+        @SuppressWarnings("unchecked")
+        KafkaTemplate<Object, Object> kafkaTemplate = mock(KafkaTemplate.class);
+        @SuppressWarnings("unchecked")
+        CompletableFuture<org.springframework.kafka.support.SendResult<Object, Object>> failedSend =
+                (CompletableFuture<org.springframework.kafka.support.SendResult<Object, Object>>)
+                        (CompletableFuture<?>) CompletableFuture.failedFuture(
+                                new KafkaException("DLT broker unavailable")
+                        );
+        @SuppressWarnings("unchecked")
+        org.springframework.kafka.support.SendResult<Object, Object> successfulResult =
+                mock(org.springframework.kafka.support.SendResult.class);
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(
+                failedSend,
+                CompletableFuture.completedFuture(successfulResult)
+        );
+
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        var errorHandler = new KafkaRetryConfig().kafkaErrorHandler(
+                kafkaTemplate,
+                meterRegistry,
+                0,
+                0
+        );
+        ConsumerRecord<String, Object> failedRecord = new ConsumerRecord<>(
+                "attendance-events",
+                0,
+                13L,
+                "attendance-key",
+                "attendance-value"
+        );
+        @SuppressWarnings("unchecked")
+        Consumer<String, Object> consumer = mock(Consumer.class);
+        MessageListenerContainer container = mock(MessageListenerContainer.class);
+
+        assertThat(errorHandler.handleOne(
+                new IllegalStateException("DLT broker unavailable"),
+                failedRecord,
+                consumer,
+                container
+        )).isFalse();
+        assertThat(errorHandler.handleOne(
+                new IllegalStateException("retry after broker recovery"),
+                failedRecord,
+                consumer,
+                container
+        )).isTrue();
+        assertThat(meterRegistry.get("stipend.kafka.dlt.publish")
+                .tag("source_topic", "attendance-events")
+                .tag("outcome", "failure")
+                .counter()
+                .count()).isEqualTo(1);
+        assertThat(meterRegistry.get("stipend.kafka.dlt.publish")
+                .tag("source_topic", "attendance-events")
+                .tag("outcome", "success")
+                .counter()
+                .count()).isEqualTo(1);
+
+        meterRegistry.close();
     }
 }

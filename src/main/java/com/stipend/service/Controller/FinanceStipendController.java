@@ -7,6 +7,7 @@ import com.stipend.service.DTO.MarkPaidStipendRequestDTO;
 import com.stipend.service.Enum.StipendStatus;
 import com.stipend.service.service.FinanceStipendReadService;
 import com.stipend.service.service.FinanceStipendWorkflowService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -91,7 +92,7 @@ public class FinanceStipendController {
     @PatchMapping("/stipends/{stipendId}/approve")
     public MonthlyStipendResponseDTO approveStipend(
             @PathVariable UUID stipendId,
-            @RequestBody(required = false) ApproveStipendRequestDTO request,
+            @Valid @RequestBody(required = false) ApproveStipendRequestDTO request,
             Principal principal
     ) {
         return financeStipendWorkflowService.approve(
@@ -104,7 +105,7 @@ public class FinanceStipendController {
     @PatchMapping("/stipends/{stipendId}/mark-paid")
     public MonthlyStipendResponseDTO markStipendPaid(
             @PathVariable UUID stipendId,
-            @RequestBody MarkPaidStipendRequestDTO request,
+            @Valid @RequestBody MarkPaidStipendRequestDTO request,
             Principal principal
     ) {
         return financeStipendWorkflowService.markPaid(

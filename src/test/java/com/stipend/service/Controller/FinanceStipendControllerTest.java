@@ -70,13 +70,16 @@ class FinanceStipendControllerTest {
     void rejectsInvalidSearchParameters() throws Exception {
         mockMvc.perform(get("/api/v1/stipends").param("month", "13"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400));
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.path").value("/api/v1/stipends"));
 
         mockMvc.perform(get("/api/v1/stipends").param("size", "101"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(get("/api/v1/stipends").param("cohortId", "not-a-uuid"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors.cohortId").value("invalid value"));
     }
 
     @Test
@@ -87,7 +90,12 @@ class FinanceStipendControllerTest {
 
         mockMvc.perform(get("/api/v1/stipends/{stipendId}", stipendId))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404));
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.message").value("Monthly stipend not found: " + stipendId))
+                .andExpect(jsonPath("$.path").value("/api/v1/stipends/" + stipendId))
+                .andExpect(jsonPath("$.validationErrors").isEmpty());
     }
 
     @Test
@@ -120,7 +128,8 @@ class FinanceStipendControllerTest {
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(get("/api/v1/cohorts/{cohortId}/stipends", cohortId))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.validationErrors.year").value("parameter is required"));
     }
 
     @Test
@@ -139,7 +148,11 @@ class FinanceStipendControllerTest {
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"comment\":\"Reviewed\"}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.status").value(409));
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.message").value("Already approved"))
+                .andExpect(jsonPath("$.path").value("/api/v1/stipends/" + stipendId + "/approve"));
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .patch("/api/v1/stipends/{stipendId}/approve", stipendId)
@@ -153,6 +166,22 @@ class FinanceStipendControllerTest {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .patch("/api/v1/stipends/{stipendId}/mark-paid", UUID.randomUUID()))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void markPaidReturnsFieldValidationErrors() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/v1/stipends/{stipendId}/mark-paid", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"paymentReference":" ","paidAt":null}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Request validation failed"))
+                .andExpect(jsonPath("$.validationErrors.paymentReference")
+                        .value("paymentReference must not be blank"))
+                .andExpect(jsonPath("$.validationErrors.paidAt").value("paidAt is required"));
     }
 
     @Test
