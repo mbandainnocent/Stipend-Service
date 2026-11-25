@@ -30,5 +30,5 @@ Thumbs.db
 application-local.properties
 application-dev.properties
 !.env.example
-config.bat
 node_modules
+config.bat
