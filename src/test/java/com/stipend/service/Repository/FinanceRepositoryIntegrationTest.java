@@ -232,6 +232,8 @@ class FinanceRepositoryIntegrationTest {
                     assertThat(stipend.getStipendMonth()).isEqualTo(10);
                     assertThat(stipend.getStatus()).isEqualTo(StipendStatus.CALCULATED);
                 });
-        assertThat(locked).extracting(MonthlyStipend::getId).isSorted();
+        // PostgreSQL orders UUIDs by unsigned bytes; java.util.UUID#compareTo uses signed
+        // longs and disagrees when the top bit differs. Lowercase hex strings sort like PostgreSQL.
+        assertThat(locked).extracting(stipend -> stipend.getId().toString()).isSorted();
     }
 }

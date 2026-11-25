@@ -30,14 +30,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = FinanceStipendController.class)
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = {
         "app.jwt.secret=" + SecurityConfigTest.SECRET,
-        "app.security.finance-roles=ADMIN,FINANCE"
+        "app.security.finance-roles=ADMIN,FINANCE",
+        "app.security.cors.allowed-origins=https://finance.example.org, http://localhost:3000"
 })
 class SecurityConfigTest {
 
@@ -153,5 +156,23 @@ class SecurityConfigTest {
                         .header("Authorization", bearer(token("ROLE_FINANCE"))))
                 .andExpect(status().isOk());
         verify(workflowService).approveCohortPeriod(eq(cohortId), eq(2026), eq(10), eq("finance@igire.test"), any());
+    }
+
+    @Test
+    void preflightFromAllowedOriginSucceedsWithoutToken() throws Exception {
+        mockMvc.perform(options("/api/v1/stipends")
+                        .header("Origin", "https://finance.example.org")
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", "Authorization"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://finance.example.org"));
+    }
+
+    @Test
+    void preflightFromUnknownOriginIsRejected() throws Exception {
+        mockMvc.perform(options("/api/v1/stipends")
+                        .header("Origin", "https://evil.example.com")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
     }
 }

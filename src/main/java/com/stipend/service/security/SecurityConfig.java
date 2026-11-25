@@ -14,6 +14,9 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -52,6 +55,8 @@ public class SecurityConfig {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                // Uses the corsConfigurationSource bean; preflights are answered before authorization.
+                .cors(cors -> { })
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
@@ -68,6 +73,33 @@ public class SecurityConfig {
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
         return http.build();
+    }
+
+    /**
+     * Browser origins allowed to call the API ({@code APP_CORS_ALLOWED_ORIGINS}, comma-separated).
+     * With none configured no CORS mapping is registered, so cross-origin browser calls are refused.
+     * Tokens travel in the Authorization header, so credentials (cookies) are not allowed.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.security.cors.allowed-origins:}") String[] allowedOrigins
+    ) {
+        List<String> origins = Arrays.stream(allowedOrigins)
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList();
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        if (!origins.isEmpty()) {
+            CorsConfiguration config = new CorsConfiguration();
+            config.setAllowedOrigins(origins);
+            config.setAllowedMethods(List.of("GET", "PATCH", "POST", "OPTIONS"));
+            config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+            config.setAllowCredentials(false);
+            config.setMaxAge(3600L);
+            source.registerCorsConfiguration("/api/**", config);
+        }
+        return source;
     }
 
     @Bean
