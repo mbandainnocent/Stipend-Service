@@ -29,5 +29,5 @@ Thumbs.db
 # Application
 application-local.properties
 application-dev.properties
-config.bat
 node_modules
+config.bat
